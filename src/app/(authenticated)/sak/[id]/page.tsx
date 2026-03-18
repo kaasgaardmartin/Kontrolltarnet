@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PARTIER, type Stemme } from '@/lib/types'
-import { hentSak, hentStortingsmandater, hentKomiteMandater, hentKomiteer, hentOrgBrukere, arkiverSak, registrerUtfall, toggleSakAbonnement, hentSakAbonnement, type SakDetaljer, type SakMedStemmer } from '@/lib/actions'
-import { beregnFlertall, harOmvendtFlertall, type Mandatfordeling, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
+import { arkiverSak, registrerUtfall, toggleSakAbonnement, type SakMedStemmer } from '@/lib/actions'
+import { beregnFlertall, harOmvendtFlertall, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
+import { useSak, useMandater, useKomiteMandater, useKomiteer, useOrgBrukere, useSakAbonnement, useInvaliderSakData } from '@/lib/queries'
 import NotatSeksjon from '@/components/NotatSeksjon'
 import LenkeSeksjon from '@/components/LenkeSeksjon'
 import StakeholderSeksjon from '@/components/StakeholderSeksjon'
@@ -45,49 +46,25 @@ export default function SakDetaljSide() {
   const router = useRouter()
   const sakId = params.id as string
 
-  const [sak, setSak] = useState<SakDetaljer | null>(null)
-  const [mandater, setMandater] = useState<Mandatfordeling[]>([])
-  const [komiteMandater, setKomiteMandater] = useState<Mandatfordeling[]>([])
-  const [komiteer, setKomiteer] = useState<{ id: string; navn: string }[]>([])
-  const [orgBrukere, setOrgBrukere] = useState<{ id: string; navn: string }[]>([])
-  const [laster, setLaster] = useState(true)
   const [visModal, setVisModal] = useState(false)
   const [visDelsakModal, setVisDelsakModal] = useState(false)
   const [redigerDelsak, setRedigerDelsak] = useState<SakMedStemmer | null>(null)
   const [bekreftArkiver, setBekreftArkiver] = useState(false)
   const [registrererUtfall, setRegistrererUtfall] = useState(false)
-  const [foelger, setFoelger] = useState(false)
 
-  const lastData = useCallback(async () => {
-    const [sakData, mandaterData, komiteerData, brukereData] = await Promise.all([
-      hentSak(sakId),
-      hentStortingsmandater(),
-      hentKomiteer(),
-      hentOrgBrukere(),
-    ])
-    setSak(sakData)
-    setMandater(mandaterData)
-    setKomiteer(komiteerData)
-    setOrgBrukere(brukereData)
-    if (sakData?.komite_id) {
-      const km = await hentKomiteMandater(sakData.komite_id)
-      setKomiteMandater(km)
-    } else {
-      setKomiteMandater([])
-    }
-    const abonnert = await hentSakAbonnement(sakId)
-    setFoelger(abonnert)
-    setLaster(false)
-  }, [sakId])
+  const { invaliderSak, invaliderSaker, invaliderVarsler } = useInvaliderSakData()
 
-  useEffect(() => { lastData() }, [lastData])
+  // React Query hooks — cached data deles med andre sider
+  const { data: sak, isLoading: lasterSak } = useSak(sakId)
+  const { data: mandater = [] } = useMandater()
+  const { data: komiteer = [] } = useKomiteer()
+  const { data: orgBrukere = [] } = useOrgBrukere()
+  const { data: komiteMandater = [] } = useKomiteMandater(sak?.komite_id)
+  const { data: foelger = false } = useSakAbonnement(sakId)
 
-  async function handleToggleFoelg() {
-    const nyStatus = await toggleSakAbonnement(sakId)
-    setFoelger(nyStatus)
-  }
+  const lastData = () => invaliderSak(sakId)
 
-  if (laster) {
+  if (lasterSak) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
         <div className="animate-pulse text-gray-400">Laster...</div>
@@ -118,15 +95,22 @@ export default function SakDetaljSide() {
   const komiteFlertall = komiteMandater.length > 0 ? beregnFlertall(stemmerForBeregning, komiteMandater) : null
   const omvendtFlertall = flertall && komiteFlertall ? harOmvendtFlertall(komiteFlertall, flertall) : false
 
+  async function handleToggleFoelg() {
+    await toggleSakAbonnement(sakId)
+    invaliderSak(sakId)
+  }
+
   async function handleUtfall(utfall: 'vedtatt' | 'ikke_vedtatt' | null) {
     setRegistrererUtfall(true)
     await registrerUtfall(sakId, utfall)
-    await lastData()
+    invaliderSak(sakId)
+    invaliderVarsler()
     setRegistrererUtfall(false)
   }
 
   async function handleArkiver() {
     await arkiverSak(sakId)
+    invaliderSaker()
     router.push('/')
   }
 
@@ -545,7 +529,8 @@ export default function SakDetaljSide() {
           komiteer={komiteer}
           onLagret={() => {
             setVisModal(false)
-            lastData()
+            invaliderSak(sakId)
+            invaliderSaker()
           }}
           onLukk={() => setVisModal(false)}
         />
@@ -567,7 +552,8 @@ export default function SakDetaljSide() {
           }}
           onLagret={() => {
             setVisDelsakModal(false)
-            lastData()
+            invaliderSak(sakId)
+            invaliderSaker()
           }}
           onLukk={() => setVisDelsakModal(false)}
         />
@@ -580,7 +566,8 @@ export default function SakDetaljSide() {
           komiteer={komiteer}
           onLagret={() => {
             setRedigerDelsak(null)
-            lastData()
+            invaliderSak(sakId)
+            invaliderSaker()
           }}
           onLukk={() => setRedigerDelsak(null)}
         />

@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Aktivitet } from '@/lib/types'
-import { hentMineAktiviteter, oppdaterAktivitetStatus } from '@/lib/actions'
+import { oppdaterAktivitetStatus } from '@/lib/actions'
 import type { AktivitetStatus } from '@/lib/types'
+import { useMineAktiviteter, useInvaliderSakData } from '@/lib/queries'
+import { useState } from 'react'
 
 type AktivitetMedSak = Aktivitet & { saker: { id: string; tittel: string } | null }
 
@@ -36,21 +37,13 @@ function fristInfo(frist: string | null): { text: string; className: string; pri
 
 export default function MineOppgaverSide() {
   const router = useRouter()
-  const [aktiviteter, setAktiviteter] = useState<AktivitetMedSak[]>([])
-  const [laster, setLaster] = useState(true)
+  const { data: aktiviteter = [], isLoading: laster } = useMineAktiviteter()
+  const { invaliderSaker } = useInvaliderSakData()
   const [filter, setFilter] = useState<'alle' | 'planlagt' | 'utført'>('planlagt')
-
-  const lastData = useCallback(async () => {
-    const data = await hentMineAktiviteter()
-    setAktiviteter(data)
-    setLaster(false)
-  }, [])
-
-  useEffect(() => { lastData() }, [lastData])
 
   async function handleStatusEndring(id: string, status: AktivitetStatus) {
     await oppdaterAktivitetStatus(id, status)
-    lastData()
+    invaliderSaker()
   }
 
   if (laster) {

@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import type { Niva } from '@/lib/types'
 import type { SakMedStemmer } from '@/lib/actions'
-import type { Aktivitet } from '@/lib/types'
-import { hentSakerMedStemmer, hentStortingsmandater, hentKomiteer, hentKommendeAktiviteter } from '@/lib/actions'
 import type { Mandatfordeling } from '@/lib/flertall'
+import { useSaker, useMandater, useKomiteer, useKommendeAktiviteter, useInvaliderSakData } from '@/lib/queries'
 import Sakstabell from '@/components/Sakstabell'
 import SakModal from '@/components/SakModal'
 
@@ -26,34 +25,17 @@ export default function Forsiden() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [hasProfile, setHasProfile] = useState<boolean | null>(null)
-  const [saker, setSaker] = useState<SakMedStemmer[]>([])
-  const [mandater, setMandater] = useState<Mandatfordeling[]>([])
-  const [komiteer, setKomiteer] = useState<{ id: string; navn: string }[]>([])
-  const [aktiviteter, setAktiviteter] = useState<(Aktivitet & { saker: { id: string; tittel: string } | null })[]>([])
   const [sok, setSok] = useState('')
   const [aktivtFilter, setAktivtFilter] = useState<Filter>('Alle')
   const [komiteFilter, setKomiteFilter] = useState<string>('')
   const [sesjonFilter, setSesjonFilter] = useState<string>('')
-  const [modalSak, setModalSak] = useState<SakMedStemmer | null | undefined>(undefined) // undefined = lukket
-  const [laster, setLaster] = useState(true)
+  const [modalSak, setModalSak] = useState<SakMedStemmer | null | undefined>(undefined)
 
-  const lastData = useCallback(async () => {
-    const [sakerData, mandaterData, komiteerData, aktiviteterData] = await Promise.all([
-      hentSakerMedStemmer(),
-      hentStortingsmandater(),
-      hentKomiteer(),
-      hentKommendeAktiviteter(),
-    ])
-    setSaker(sakerData)
-    setMandater(mandaterData)
-    setKomiteer(komiteerData)
-    setAktiviteter(aktiviteterData)
-    setLaster(false)
-  }, [])
+  const { invaliderSaker } = useInvaliderSakData()
 
+  // Auth check
   useEffect(() => {
     const supabase = createClient()
-
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user)
       if (user) {
@@ -63,13 +45,19 @@ export default function Forsiden() {
           .eq('id', user.id)
           .single()
           .then(({ data, error }) => {
-            const harProfil = !error && !!data
-            setHasProfile(harProfil)
-            if (harProfil) lastData()
+            setHasProfile(!error && !!data)
           })
       }
     })
-  }, [lastData])
+  }, [])
+
+  // React Query hooks — data caches og deles mellom sider
+  const { data: saker = [], isLoading: lasterSaker } = useSaker()
+  const { data: mandater = [], isLoading: lasterMandater } = useMandater()
+  const { data: komiteer = [] } = useKomiteer()
+  const { data: aktiviteter = [] } = useKommendeAktiviteter()
+
+  const laster = hasProfile === null || (hasProfile && (lasterSaker || lasterMandater))
 
   // Waiting list
   if (hasProfile === false) {
@@ -94,7 +82,7 @@ export default function Forsiden() {
     )
   }
 
-  if (hasProfile === null || laster) {
+  if (laster) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-pulse text-gray-400">Laster...</div>
@@ -109,7 +97,6 @@ export default function Forsiden() {
 
   // Filter logic
   const filtrerteSaker = saker.filter(sak => {
-    // Search filter (includes delsaker titles and stakeholder names)
     if (sok) {
       const sokLower = sok.toLowerCase()
       const tittelMatch = sak.tittel.toLowerCase().includes(sokLower)
@@ -118,7 +105,6 @@ export default function Forsiden() {
       if (!tittelMatch && !delsakMatch && !stakeholderMatch) return false
     }
 
-    // Level filter
     if (aktivtFilter === 'Behandles snart') {
       const now = new Date()
       const toUkerFrem = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
@@ -132,10 +118,7 @@ export default function Forsiden() {
       if (niva && sak.niva !== niva) return false
     }
 
-    // Komité filter
     if (komiteFilter && sak.komite_id !== komiteFilter) return false
-
-    // Sesjon filter
     if (sesjonFilter && sak.sesjon !== sesjonFilter) return false
 
     return true
@@ -295,7 +278,7 @@ export default function Forsiden() {
           komiteer={komiteer}
           onLagret={() => {
             setModalSak(undefined)
-            lastData()
+            invaliderSaker()
           }}
           onLukk={() => setModalSak(undefined)}
         />

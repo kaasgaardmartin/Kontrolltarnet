@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { hentVarsler, hentAntallUlesteVarsler, markerVarselLest, markerAlleVarslerLest } from '@/lib/actions'
+import { hentVarsler, markerVarselLest, markerAlleVarslerLest } from '@/lib/actions'
+import { useUlesteVarsler, useInvaliderSakData } from '@/lib/queries'
 import type { User } from '@supabase/supabase-js'
 import type { Varsel, VarselType } from '@/lib/types'
 
@@ -44,7 +45,8 @@ export default function Toppmeny() {
   const [showProfile, setShowProfile] = useState(false)
   const [showVarsler, setShowVarsler] = useState(false)
   const [varsler, setVarsler] = useState<Varsel[]>([])
-  const [uleste, setUleste] = useState(0)
+  const { data: uleste = 0 } = useUlesteVarsler()
+  const { invaliderVarsler } = useInvaliderSakData()
   const profileRef = useRef<HTMLDivElement>(null)
   const varselRef = useRef<HTMLDivElement>(null)
 
@@ -62,17 +64,9 @@ export default function Toppmeny() {
           .then(({ data }) => {
             if (data) setBruker(data as unknown as BrukerData)
           })
-
-        // Fetch notification count
-        hentAntallUlesteVarsler().then(setUleste)
       }
     })
   }, [])
-
-  // Refresh unread count on navigation
-  useEffect(() => {
-    hentAntallUlesteVarsler().then(setUleste)
-  }, [pathname])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -107,7 +101,7 @@ export default function Toppmeny() {
     if (!varsel.lest) {
       await markerVarselLest(varsel.id)
       setVarsler(prev => prev.map(v => v.id === varsel.id ? { ...v, lest: true } : v))
-      setUleste(prev => Math.max(0, prev - 1))
+      invaliderVarsler()
     }
     setShowVarsler(false)
     if (varsel.sak_id) {
@@ -118,7 +112,7 @@ export default function Toppmeny() {
   async function handleMarkerAlleLest() {
     await markerAlleVarslerLest()
     setVarsler(prev => prev.map(v => ({ ...v, lest: true })))
-    setUleste(0)
+    invaliderVarsler()
   }
 
   const erOrgAdmin = bruker?.rolle === 'org-admin'

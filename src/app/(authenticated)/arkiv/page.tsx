@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { PARTIER, type Stemme } from '@/lib/types'
-import { hentArkiverteSaker, hentStortingsmandater, gjenopprettSak, type SakMedStemmer } from '@/lib/actions'
-import { beregnFlertall, type Mandatfordeling, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
+import { gjenopprettSak, type SakMedStemmer } from '@/lib/actions'
+import { beregnFlertall, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
+import { useArkiverteSaker, useMandater, useInvaliderSakData } from '@/lib/queries'
 
 const STEMME_STIL: Record<Stemme, { bg: string; text: string; label: string }> = {
   for: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'F' },
@@ -19,22 +19,15 @@ function getStemme(sak: SakMedStemmer, parti: string): Stemme {
 
 export default function ArkivPage() {
   const router = useRouter()
-  const [saker, setSaker] = useState<SakMedStemmer[]>([])
-  const [mandater, setMandater] = useState<Mandatfordeling[]>([])
-  const [laster, setLaster] = useState(true)
+  const { data: saker = [], isLoading: lasterSaker } = useArkiverteSaker()
+  const { data: mandater = [], isLoading: lasterMandater } = useMandater()
+  const { invaliderSaker } = useInvaliderSakData()
 
-  const lastData = useCallback(async () => {
-    const [s, m] = await Promise.all([hentArkiverteSaker(), hentStortingsmandater()])
-    setSaker(s)
-    setMandater(m)
-    setLaster(false)
-  }, [])
-
-  useEffect(() => { lastData() }, [lastData])
+  const laster = lasterSaker || lasterMandater
 
   async function handleGjenopprett(sakId: string) {
     await gjenopprettSak(sakId)
-    lastData()
+    invaliderSaker()
   }
 
   if (laster) {

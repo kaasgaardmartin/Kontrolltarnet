@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { PARTIER } from '@/lib/types'
 import {
-  hentKomiteerMedMandater,
-  hentStortingsmandater,
   opprettKomite,
   oppdaterKomite,
   slettKomite,
@@ -12,6 +10,7 @@ import {
   oppdaterStortingsmandater,
   type KomiteMedMandater,
 } from '@/lib/actions'
+import { useKomiteerMedMandater, useMandater, useInvaliderSakData } from '@/lib/queries'
 import MandatEditor from '@/components/MandatEditor'
 
 function toRecord(mandater: { parti: string; antall: number }[]): Record<string, number> {
@@ -26,9 +25,11 @@ function toArray(mandater: Record<string, number>) {
 }
 
 export default function AdminPage() {
-  const [komiteer, setKomiteer] = useState<KomiteMedMandater[]>([])
-  const [stortingsmandater, setStortingsmandater] = useState<Record<string, number>>({})
-  const [laster, setLaster] = useState(true)
+  const { data: komiteer = [], isLoading: lasterKomiteer } = useKomiteerMedMandater()
+  const { data: mandaterRaw = [], isLoading: lasterMandater } = useMandater()
+  const { invaliderAdmin } = useInvaliderSakData()
+
+  const [stortingsmandater, setStortingsmandater] = useState<Record<string, number> | null>(null)
   const [nyttKomiteNavn, setNyttKomiteNavn] = useState('')
   const [redigererKomite, setRedigererKomite] = useState<string | null>(null)
   const [redigertNavn, setRedigertNavn] = useState('')
@@ -37,17 +38,10 @@ export default function AdminPage() {
   const [lagrerStorting, setLagrerStorting] = useState(false)
   const [bekreftSlett, setBekreftSlett] = useState<string | null>(null)
 
-  const lastData = useCallback(async () => {
-    const [k, s] = await Promise.all([
-      hentKomiteerMedMandater(),
-      hentStortingsmandater(),
-    ])
-    setKomiteer(k)
-    setStortingsmandater(toRecord(s))
-    setLaster(false)
-  }, [])
+  // Bruk lokalt redigerte mandater hvis de finnes, ellers data fra server
+  const visStortingsmandater = stortingsmandater ?? toRecord(mandaterRaw)
 
-  useEffect(() => { lastData() }, [lastData])
+  const laster = lasterKomiteer || lasterMandater
 
   async function handleOpprettKomite() {
     if (!nyttKomiteNavn.trim()) return
@@ -55,7 +49,7 @@ export default function AdminPage() {
     await opprettKomite(nyttKomiteNavn.trim())
     setNyttKomiteNavn('')
     setLagrer(false)
-    lastData()
+    invaliderAdmin()
   }
 
   function startRediger(komite: KomiteMedMandater) {
@@ -70,7 +64,7 @@ export default function AdminPage() {
     await oppdaterKomiteMandater(komiteId, toArray(redigertMandater))
     setRedigererKomite(null)
     setLagrer(false)
-    lastData()
+    invaliderAdmin()
   }
 
   async function handleSlettKomite(komiteId: string) {
@@ -78,13 +72,15 @@ export default function AdminPage() {
     await slettKomite(komiteId)
     setBekreftSlett(null)
     setLagrer(false)
-    lastData()
+    invaliderAdmin()
   }
 
   async function lagreStortingsmandater() {
     setLagrerStorting(true)
-    await oppdaterStortingsmandater(toArray(stortingsmandater))
+    await oppdaterStortingsmandater(toArray(visStortingsmandater))
+    setStortingsmandater(null)
     setLagrerStorting(false)
+    invaliderAdmin()
   }
 
   if (laster) {
@@ -102,7 +98,7 @@ export default function AdminPage() {
         <h1 className="text-xl font-bold text-[#0F1923] mb-1">Stortingsmandater</h1>
         <p className="text-sm text-gray-500 mb-4">Mandatfordeling i Stortingssalen</p>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-          <MandatEditor mandater={stortingsmandater} onChange={setStortingsmandater} />
+          <MandatEditor mandater={visStortingsmandater} onChange={setStortingsmandater} />
           <div className="mt-4 flex justify-end">
             <button
               onClick={lagreStortingsmandater}
