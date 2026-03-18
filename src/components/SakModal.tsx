@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PARTIER, type Stemme, type Niva, type Landing } from '@/lib/types'
 import { opprettSak, oppdaterSak, slettSak, type SakFormData, type SakMedStemmer } from '@/lib/actions'
+import type { StortingetSak } from '@/app/api/stortinget/route'
 
 interface Komite {
   id: string
@@ -23,6 +24,7 @@ interface Props {
   komiteer: Komite[]
   forelderId?: string | null  // for creating delsak
   forelderData?: ForelderData | null  // parent data for pre-filling
+  importertStortingetSak?: StortingetSak | null  // data fra Stortinget-import
   onLagret: () => void
   onLukk: () => void
 }
@@ -53,15 +55,24 @@ function getStemmeForParti(sak: SakMedStemmer | null, parti: string): Stemme {
   return (found?.stemme as Stemme) || 'ukjent'
 }
 
-export default function SakModal({ sak, komiteer, forelderId, forelderData, onLagret, onLukk }: Props) {
+export default function SakModal({ sak, komiteer, forelderId, forelderData, importertStortingetSak, onLagret, onLukk }: Props) {
   const erNy = !sak
   const fd = forelderData // shorthand for parent defaults
-  const [tittel, setTittel] = useState(sak?.tittel ?? '')
-  const [beskrivelse, setBeskrivelse] = useState(sak?.beskrivelse ?? '')
-  const [niva, setNiva] = useState<Niva | ''>(sak?.niva ?? (fd?.niva as Niva) ?? '')
+  const imp = importertStortingetSak // shorthand for import data
+
+  // Finn komité-ID basert på Stortinget-import (match på navn)
+  const importKomiteId = imp?.komite
+    ? komiteer.find(k => k.navn.toLowerCase().includes(imp.komite!.toLowerCase()))?.id ?? ''
+    : ''
+
+  const [tittel, setTittel] = useState(sak?.tittel ?? imp?.korttittel ?? imp?.tittel ?? '')
+  const [beskrivelse, setBeskrivelse] = useState(sak?.beskrivelse ?? (imp ? imp.tittel : '') ?? '')
+  const [niva, setNiva] = useState<Niva | ''>(sak?.niva ?? (fd?.niva as Niva) ?? (imp ? 'storting' : ''))
   const [landing, setLanding] = useState<Landing>(sak?.landing ?? 'ukjent')
-  const [komiteId, setKomiteId] = useState(sak?.komite_id ?? fd?.komite_id ?? '')
-  const [stortingssakRef, setStortingssakRef] = useState(sak?.stortingssak_ref ?? fd?.stortingssak_ref ?? '')
+  const [komiteId, setKomiteId] = useState(sak?.komite_id ?? fd?.komite_id ?? importKomiteId)
+  const [stortingssakRef, setStortingssakRef] = useState(
+    sak?.stortingssak_ref ?? fd?.stortingssak_ref ?? (imp ? `https://www.stortinget.no/no/Saker-og-publikasjoner/Saker/Sak/?p=${imp.id}` : '')
+  )
   const [sesjon, setSesjon] = useState(sak?.sesjon ?? fd?.sesjon ?? '')
   const [komiteDato, setKomiteDato] = useState(sak?.komite_dato ?? fd?.komite_dato ?? '')
   const [stortingsDato, setStortingsDato] = useState(sak?.stortings_dato ?? fd?.stortings_dato ?? '')
@@ -154,6 +165,19 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, onLa
         </div>
 
         <div className="px-6 py-5 space-y-5">
+          {/* Stortinget-import banner */}
+          {imp && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#BA0C2F]/5 border border-[#BA0C2F]/20 rounded-lg">
+              <svg className="w-4 h-4 text-[#BA0C2F] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21" />
+              </svg>
+              <span className="text-xs text-[#BA0C2F]">
+                Importert fra Stortinget — sak #{imp.id}
+                {imp.henvisning && ` (${imp.henvisning})`}
+              </span>
+            </div>
+          )}
+
           {/* Tittel */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tittel *</label>

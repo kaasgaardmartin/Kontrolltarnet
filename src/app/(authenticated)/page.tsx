@@ -7,9 +7,11 @@ import type { User } from '@supabase/supabase-js'
 import type { Niva } from '@/lib/types'
 import type { SakMedStemmer } from '@/lib/actions'
 import type { Mandatfordeling } from '@/lib/flertall'
+import type { StortingetSak } from '@/app/api/stortinget/route'
 import { useSaker, useMandater, useKomiteer, useKommendeAktiviteter, useInvaliderSakData } from '@/lib/queries'
 import Sakstabell from '@/components/Sakstabell'
 import SakModal from '@/components/SakModal'
+import StortingetImport from '@/components/StortingetImport'
 
 type Filter = 'Alle' | 'Storting' | 'Departement' | 'Intern' | 'Behandles snart'
 
@@ -30,6 +32,8 @@ export default function Forsiden() {
   const [komiteFilter, setKomiteFilter] = useState<string>('')
   const [sesjonFilter, setSesjonFilter] = useState<string>('')
   const [modalSak, setModalSak] = useState<SakMedStemmer | null | undefined>(undefined)
+  const [visStortingetImport, setVisStortingetImport] = useState(false)
+  const [importertSak, setImportertSak] = useState<StortingetSak | null>(null)
 
   const { invaliderSaker } = useInvaliderSakData()
 
@@ -138,6 +142,15 @@ export default function Forsiden() {
         <div className="flex items-center gap-3">
           <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
             PDF-rapport
+          </button>
+          <button
+            onClick={() => setVisStortingetImport(true)}
+            className="px-4 py-2 text-sm border border-[#BA0C2F]/30 text-[#BA0C2F] rounded-lg hover:bg-[#BA0C2F]/5 transition-colors flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21" />
+            </svg>
+            Stortinget
           </button>
           <button
             onClick={() => setModalSak(null)}
@@ -278,9 +291,26 @@ export default function Forsiden() {
           komiteer={komiteer}
           onLagret={() => {
             setModalSak(undefined)
+            setImportertSak(null)
             invaliderSaker()
           }}
-          onLukk={() => setModalSak(undefined)}
+          onLukk={() => {
+            setModalSak(undefined)
+            setImportertSak(null)
+          }}
+          importertStortingetSak={importertSak}
+        />
+      )}
+
+      {/* Stortinget Import */}
+      {visStortingetImport && (
+        <StortingetImport
+          onImporter={(stortingetSak) => {
+            setVisStortingetImport(false)
+            setImportertSak(stortingetSak)
+            setModalSak(null) // null = ny sak, men med prefill fra importertSak
+          }}
+          onLukk={() => setVisStortingetImport(false)}
         />
       )}
     </div>
