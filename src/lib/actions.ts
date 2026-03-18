@@ -1,5 +1,6 @@
 'use server'
 
+import { unstable_cache } from 'next/cache'
 import { createServerSupabaseClient } from './supabase-server'
 import type { Sak, PartiStemme, Stemme, Niva, Landing, Notat, Lenke, LenkeType, Komite, KomiteMandat, Rolle, Bruker, Stakeholder, SakStakeholder, Aktivitet, StakeholderType, Holdning, Innflytelse, AktivitetType, AktivitetStatus, Varsel, VarselType } from './types'
 
@@ -72,43 +73,64 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
 }
 
 export async function hentStortingsmandater() {
-  const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return []
 
-  const { data } = await supabase
-    .from('stortingssalen_mandater')
-    .select('parti, antall')
-    .eq('organisasjon_id', bruker.organisasjon_id)
+  const cachedFetch = unstable_cache(
+    async (orgId: string) => {
+      const supabase = await createServerSupabaseClient()
+      const { data } = await supabase
+        .from('stortingssalen_mandater')
+        .select('parti, antall')
+        .eq('organisasjon_id', orgId)
+      return data ?? []
+    },
+    ['stortingsmandater'],
+    { revalidate: 3600 } // cache 1 time
+  )
 
-  return data ?? []
+  return cachedFetch(bruker.organisasjon_id)
 }
 
 export async function hentKomiteMandater(komiteId: string) {
-  const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return []
 
-  const { data } = await supabase
-    .from('komite_mandater')
-    .select('parti, antall')
-    .eq('komite_id', komiteId)
+  const cachedFetch = unstable_cache(
+    async (kId: string) => {
+      const supabase = await createServerSupabaseClient()
+      const { data } = await supabase
+        .from('komite_mandater')
+        .select('parti, antall')
+        .eq('komite_id', kId)
+      return data ?? []
+    },
+    ['komitemandater', komiteId],
+    { revalidate: 3600 }
+  )
 
-  return data ?? []
+  return cachedFetch(komiteId)
 }
 
 export async function hentKomiteer() {
-  const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return []
 
-  const { data } = await supabase
-    .from('komiteer')
-    .select('id, navn')
-    .eq('organisasjon_id', bruker.organisasjon_id)
-    .order('navn')
+  const cachedFetch = unstable_cache(
+    async (orgId: string) => {
+      const supabase = await createServerSupabaseClient()
+      const { data } = await supabase
+        .from('komiteer')
+        .select('id, navn')
+        .eq('organisasjon_id', orgId)
+        .order('navn')
+      return data ?? []
+    },
+    ['komiteer'],
+    { revalidate: 3600 }
+  )
 
-  return data ?? []
+  return cachedFetch(bruker.organisasjon_id)
 }
 
 export async function opprettSak(formData: SakFormData): Promise<{ success: boolean; error?: string }> {
