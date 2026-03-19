@@ -45,7 +45,7 @@ function parseNorskDato(dato: string | null): string | null {
   return `${match[3]}-${match[2]}-${match[1]}`
 }
 
-// Henter dato for en spesifikk saksgang-hendelse (f.eks. AVGITT, BEHS)
+// Henter dato for en spesifikk saksgang-hendelse (f.eks. AVGFRIST, AVGITT, BEHS)
 function extractHendelseDato(sakXml: string, hendelseId: string): string | null {
   const hendelseRegex = /<saksgang_hendelse>([\s\S]*?)<\/saksgang_hendelse>/g
   let m
@@ -54,6 +54,8 @@ function extractHendelseDato(sakXml: string, hendelseId: string): string | null 
     const id = extractText(block, 'id')
     if (id === hendelseId) {
       const dato = extractText(block, 'dato')
+      // Ignorer placeholder-datoer (01.01.0001)
+      if (dato?.startsWith('01.01.0001')) return null
       return parseNorskDato(dato)
     }
   }
@@ -98,8 +100,12 @@ function parseSak(sakXml: string): StortingetSak {
   }
 
   // Datoer fra saksgang-hendelser
-  const innstilling_dato = extractHendelseDato(sakXml, 'AVGITT')  // Komité avgir innstilling
-  const behandling_dato = extractHendelseDato(sakXml, 'BEHS')     // Behandling i salen
+  // Komitédato: AVGFRIST (frist for avgivelse) → fallback til AVGITT (faktisk avgitt)
+  const innstilling_dato = extractHendelseDato(sakXml, 'AVGFRIST')
+    ?? extractHendelseDato(sakXml, 'AVGITT')
+  // Stortingsdato: BEHS (behandling i salen) → fallback til VOT (votering)
+  const behandling_dato = extractHendelseDato(sakXml, 'BEHS')
+    ?? extractHendelseDato(sakXml, 'VOT')
 
   return {
     id,
