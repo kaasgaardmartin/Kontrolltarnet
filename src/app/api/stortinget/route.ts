@@ -61,16 +61,26 @@ function extractHendelseDato(sakXml: string, hendelseId: string): string | null 
 }
 
 function parseSak(sakXml: string): StortingetSak {
-  const id = extractText(sakXml, 'id') ?? ''
-  const tittel = extractText(sakXml, 'tittel') ?? ''
-  const korttittel = extractText(sakXml, 'korttittel') ?? ''
-  const type = extractText(sakXml, 'type') ?? ''
-  const status = extractText(sakXml, 'status') ?? ''
-  const dokumentgruppe = extractText(sakXml, 'dokumentgruppe') ?? ''
-  const henvisning = extractText(sakXml, 'henvisning')
-  const sist_oppdatert = extractText(sakXml, 'sist_oppdatert_dato')
+  // Fjern nestede blokker for å finne top-level felter riktig
+  // (unngår å matche <id> inne i emne_liste, komite, forslagstiller_liste osv.)
+  const topLevel = sakXml
+    .replace(/<emne_liste>[\s\S]*?<\/emne_liste>/g, '')
+    .replace(/<forslagstiller_liste>[\s\S]*?<\/forslagstiller_liste>/g, '')
+    .replace(/<saksordfoerer_liste>[\s\S]*?<\/saksordfoerer_liste>/g, '')
+    .replace(/<komite>[\s\S]*?<\/komite>/g, '')
+    .replace(/<saksgang>[\s\S]*?<\/saksgang>/g, '')
+    .replace(/<publikasjon_referanse_liste>[\s\S]*?<\/publikasjon_referanse_liste>/g, '')
 
-  // Komité
+  const id = extractText(topLevel, 'id') ?? ''
+  const tittel = extractText(topLevel, 'tittel') ?? ''
+  const korttittel = extractText(topLevel, 'korttittel') ?? ''
+  const type = extractText(topLevel, 'type') ?? ''
+  const status = extractText(topLevel, 'status') ?? ''
+  const dokumentgruppe = extractText(topLevel, 'dokumentgruppe') ?? ''
+  const henvisning = extractText(topLevel, 'henvisning')
+  const sist_oppdatert = extractText(topLevel, 'sist_oppdatert_dato')
+
+  // Komité (fra den nestede blokken)
   const komiteBlock = sakXml.match(/<komite>([\s\S]*?)<\/komite>/)
   let komite: string | null = null
   let komite_id: string | null = null
@@ -79,7 +89,7 @@ function parseSak(sakXml: string): StortingetSak {
     komite_id = extractText(komiteBlock[1], 'id')
   }
 
-  // Emner
+  // Emner (fra den nestede blokken)
   const emneBlock = sakXml.match(/<emne_liste>([\s\S]*?)<\/emne_liste>/)
   const emner: string[] = []
   if (emneBlock) {
