@@ -103,8 +103,9 @@ function parseSak(sakXml: string): StortingetSak {
   // Komitédato: AVGFRIST (frist for avgivelse) → fallback til AVGITT (faktisk avgitt)
   const innstilling_dato = extractHendelseDato(sakXml, 'AVGFRIST')
     ?? extractHendelseDato(sakXml, 'AVGITT')
-  // Stortingsdato: BEHS (behandling i salen) → fallback til VOT (votering)
-  const behandling_dato = extractHendelseDato(sakXml, 'BEHS')
+  // Stortingsdato: PLBEHS (planlagt behandling) → BEHS (faktisk behandlet) → VOT (votering)
+  const behandling_dato = extractHendelseDato(sakXml, 'PLBEHS')
+    ?? extractHendelseDato(sakXml, 'BEHS')
     ?? extractHendelseDato(sakXml, 'VOT')
 
   return {
@@ -124,11 +125,42 @@ function parseSak(sakXml: string): StortingetSak {
   }
 }
 
+// Hent detaljer for én enkelt sak (inkl. saksgang med datoer)
+async function hentSakDetaljer(sakId: string): Promise<StortingetSak | null> {
+  const url = `https://data.stortinget.no/eksport/sak?sakid=${encodeURIComponent(sakId)}`
+  const response = await fetch(url)
+  if (!response.ok) return null
+  const xml = await response.text()
+  return parseSak(xml)
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
+  const sakId = searchParams.get('sakid')
   const sesjonId = searchParams.get('sesjon') || '2024-2025'
   const sok = searchParams.get('sok')?.toLowerCase()
 
+  // Hent én enkelt sak med fulle detaljer (inkl. datoer)
+  if (sakId) {
+    try {
+      const sak = await hentSakDetaljer(sakId)
+      if (!sak) {
+        return NextResponse.json(
+          { error: `Fant ikke sak ${sakId}` },
+          { status: 404 }
+        )
+      }
+      return NextResponse.json({ sak })
+    } catch (error) {
+      console.error('Feil ved henting av sak:', error)
+      return NextResponse.json(
+        { error: 'Kunne ikke hente sak fra Stortinget' },
+        { status: 500 }
+      )
+    }
+  }
+
+  // Søk i saker for en sesjon
   try {
     const url = `https://data.stortinget.no/eksport/saker?sesjonid=${encodeURIComponent(sesjonId)}`
     const response = await fetch(url, {

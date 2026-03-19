@@ -40,6 +40,7 @@ export default function StortingetImport({ onImporter, onLukk }: Props) {
   const [saker, setSaker] = useState<StortingetSak[]>([])
   const [antall, setAntall] = useState(0)
   const [laster, setLaster] = useState(false)
+  const [henterDetaljer, setHenterDetaljer] = useState<string | null>(null)
   const [feil, setFeil] = useState('')
   const [harSokt, setHarSokt] = useState(false)
 
@@ -69,6 +70,26 @@ export default function StortingetImport({ onImporter, onLukk }: Props) {
       setLaster(false)
     }
   }, [])
+
+  // Hent fulle detaljer (inkl. datoer) for valgt sak før import
+  async function handleImporter(sak: StortingetSak) {
+    setHenterDetaljer(sak.id)
+    try {
+      const res = await fetch(`/api/stortinget?sakid=${sak.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        onImporter(data.sak)
+      } else {
+        // Fallback: bruk listen-data uten datoer
+        onImporter(sak)
+      }
+    } catch {
+      // Fallback: bruk listen-data uten datoer
+      onImporter(sak)
+    } finally {
+      setHenterDetaljer(null)
+    }
+  }
 
   function handleSok(e: React.FormEvent) {
     e.preventDefault()
@@ -246,10 +267,11 @@ export default function StortingetImport({ onImporter, onLukk }: Props) {
                         )}
                       </div>
                       <button
-                        onClick={() => onImporter(sak)}
-                        className="shrink-0 px-3 py-1.5 text-xs bg-[#4A9EDB] text-white rounded-lg hover:bg-[#3a8ecb] transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={() => handleImporter(sak)}
+                        disabled={henterDetaljer === sak.id}
+                        className="shrink-0 px-3 py-1.5 text-xs bg-[#4A9EDB] text-white rounded-lg hover:bg-[#3a8ecb] transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-100"
                       >
-                        Importer
+                        {henterDetaljer === sak.id ? 'Henter...' : 'Importer'}
                       </button>
                     </div>
                   </div>
