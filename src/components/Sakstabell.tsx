@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { PARTIER, type Stemme } from '@/lib/types'
 import { beregnFlertall, type Mandatfordeling, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
 import type { SakMedStemmer } from '@/lib/actions'
@@ -49,11 +50,13 @@ function SaksRad({
   mandater,
   onKlikk,
   erDelsak = false,
+  delsakToggle,
 }: {
   sak: SakMedStemmer
   mandater: Mandatfordeling[]
   onKlikk: (sak: SakMedStemmer) => void
   erDelsak?: boolean
+  delsakToggle?: { utfoldet: boolean; antall: number; onToggle: () => void }
 }) {
   const stemmerForBeregning: FlertallPartiStemme[] = PARTIER.map(p => ({
     parti: p,
@@ -75,14 +78,33 @@ function SaksRad({
     >
       <td className={`py-3 ${erDelsak ? 'pl-10 pr-4' : 'px-4'}`}>
         <div className="flex items-center gap-2">
+          {delsakToggle && (
+            <button
+              onClick={e => { e.stopPropagation(); delsakToggle.onToggle() }}
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
+              title={delsakToggle.utfoldet ? 'Skjul delsaker' : `Vis ${delsakToggle.antall} delsak${delsakToggle.antall > 1 ? 'er' : ''}`}
+            >
+              <svg
+                className={`w-3.5 h-3.5 transition-transform duration-150 ${delsakToggle.utfoldet ? 'rotate-90' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          )}
           {erDelsak && (
             <svg className="w-3 h-3 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15" />
             </svg>
           )}
           <div>
-            <div className={`font-medium text-[#0F1923] truncate max-w-[280px] ${erDelsak ? 'text-xs' : ''}`}>
-              {sak.tittel}
+            <div className="flex items-center gap-1.5">
+              <span className={`font-medium text-[#0F1923] truncate max-w-[280px] ${erDelsak ? 'text-xs' : ''}`}>
+                {sak.tittel}
+              </span>
+              {delsakToggle && !delsakToggle.utfoldet && (
+                <span className="text-xs text-gray-400 shrink-0">({delsakToggle.antall})</span>
+              )}
             </div>
             {sak.stortingssak_ref && (
               <div className="text-xs mt-0.5">
@@ -212,10 +234,22 @@ function SaksRadMedDelsaker({
   mandater: Mandatfordeling[]
   onKlikk: (sak: SakMedStemmer) => void
 }) {
+  const [utfoldet, setUtfoldet] = useState(false)
+  const harDelsaker = sak.delsaker && sak.delsaker.length > 0
+
   return (
     <>
-      <SaksRad sak={sak} mandater={mandater} onKlikk={onKlikk} />
-      {sak.delsaker && sak.delsaker.map(delsak => (
+      <SaksRad
+        sak={sak}
+        mandater={mandater}
+        onKlikk={onKlikk}
+        delsakToggle={harDelsaker ? {
+          utfoldet,
+          antall: sak.delsaker!.length,
+          onToggle: () => setUtfoldet(prev => !prev),
+        } : undefined}
+      />
+      {harDelsaker && utfoldet && sak.delsaker!.map(delsak => (
         <SaksRad key={delsak.id} sak={delsak} mandater={mandater} onKlikk={onKlikk} erDelsak />
       ))}
     </>
