@@ -149,35 +149,43 @@ function SaksRad({
           </span>
         )}
       </td>
-      {PARTIER.map(parti => {
-        const stemme = getStemme(sak, parti)
-        const stil = STEMME_STIL[stemme]
-        return (
-          <td key={parti} className="px-1 py-3 text-center">
-            <span className={`inline-flex items-center justify-center ${erDelsak ? 'w-6 h-6' : 'w-7 h-7'} rounded text-xs font-medium ${stil.bg} ${stil.text}`}>
-              {stil.label}
-            </span>
-          </td>
-        )
-      })}
-      <td className="px-3 py-3 text-center">
-        {flertall ? (
-          <div className={`text-xs font-medium ${
-            flertall.harFlertall === 'for' ? 'text-emerald-600' :
-            flertall.harFlertall === 'mot' ? 'text-red-600' :
-            'text-gray-400'
-          }`}>
-            <span>{flertall.forMandater}</span>
-            <span className="text-gray-300 mx-0.5">/</span>
-            <span>{flertall.motMandater}</span>
-            {flertall.ukjentMandater > 0 && (
-              <span className="text-gray-300 ml-1">({flertall.ukjentMandater}?)</span>
+      {sak.niva === 'departement' ? (
+        <td colSpan={PARTIER.length + 1} className="px-3 py-3 text-center">
+          <span className="text-xs text-gray-400 italic">Departementssak — ingen partistemmer</span>
+        </td>
+      ) : (
+        <>
+          {PARTIER.map(parti => {
+            const stemme = getStemme(sak, parti)
+            const stil = STEMME_STIL[stemme]
+            return (
+              <td key={parti} className="px-1 py-3 text-center">
+                <span className={`inline-flex items-center justify-center ${erDelsak ? 'w-6 h-6' : 'w-7 h-7'} rounded text-xs font-medium ${stil.bg} ${stil.text}`}>
+                  {stil.label}
+                </span>
+              </td>
+            )
+          })}
+          <td className="px-3 py-3 text-center">
+            {flertall ? (
+              <div className={`text-xs font-medium ${
+                flertall.harFlertall === 'for' ? 'text-emerald-600' :
+                flertall.harFlertall === 'mot' ? 'text-red-600' :
+                'text-gray-400'
+              }`}>
+                <span>{flertall.forMandater}</span>
+                <span className="text-gray-300 mx-0.5">/</span>
+                <span>{flertall.motMandater}</span>
+                {flertall.ukjentMandater > 0 && (
+                  <span className="text-gray-300 ml-1">({flertall.ukjentMandater}?)</span>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-gray-300">–</span>
             )}
-          </div>
-        ) : (
-          <span className="text-xs text-gray-300">–</span>
-        )}
-      </td>
+          </td>
+        </>
+      )}
     </tr>
   )
 }

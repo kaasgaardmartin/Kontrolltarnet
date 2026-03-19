@@ -307,99 +307,105 @@ export default function SakDetaljSide() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: Partistemmer + Flertall + Delsaker */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Partistemmer */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-[#0F1923] mb-3">Partistemmer</h3>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              {PARTIER.map(parti => {
-                const found = sak.partistemmer.find(s => s.parti === parti)
-                const stemme = (found?.stemme as Stemme) || 'ukjent'
-                const stil = STEMME_STIL[stemme]
-                return (
-                  <div key={parti} className={`flex items-center gap-2 px-3 py-2 rounded-lg ${stil.bg}`}>
-                    <span className="text-sm font-medium text-gray-700">{parti}</span>
-                    <span className={`text-xs ${stil.text}`}>{stil.label}</span>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Flertall */}
-            {(komiteFlertall || flertall) && (
-              <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Flertall</h4>
-
-                {komiteFlertall && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-500 w-20 shrink-0">{sak.komiteer?.navn || 'Komité'}</span>
-                    <div className="flex-1">
-                      <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
-                        {komiteFlertall.forMandater > 0 && (
-                          <div className="bg-emerald-400" style={{ width: `${komiteFlertall.prosentFor}%` }} />
-                        )}
-                        {komiteFlertall.motMandater > 0 && (
-                          <div className="bg-red-400" style={{ width: `${komiteFlertall.prosentMot}%` }} />
-                        )}
-                      </div>
+          {/* Partistemmer — skjules for departementssaker */}
+          {sak.niva !== 'departement' ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <h3 className="text-sm font-semibold text-[#0F1923] mb-3">Partistemmer</h3>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {PARTIER.map(parti => {
+                  const found = sak.partistemmer.find(s => s.parti === parti)
+                  const stemme = (found?.stemme as Stemme) || 'ukjent'
+                  const stil = STEMME_STIL[stemme]
+                  return (
+                    <div key={parti} className={`flex items-center gap-2 px-3 py-2 rounded-lg ${stil.bg}`}>
+                      <span className="text-sm font-medium text-gray-700">{parti}</span>
+                      <span className={`text-xs ${stil.text}`}>{stil.label}</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-gray-500">
-                        {komiteFlertall.forMandater}/{komiteFlertall.motMandater}
-                        {komiteFlertall.ukjentMandater > 0 && <span className="text-gray-300">/{komiteFlertall.ukjentMandater}</span>}
-                      </span>
-                      <span className={`text-xs font-medium ${
-                        komiteFlertall.harFlertall === 'for' ? 'text-emerald-600' :
-                        komiteFlertall.harFlertall === 'mot' ? 'text-red-600' :
-                        'text-gray-400'
-                      }`}>
-                        {komiteFlertall.harFlertall === 'for' ? 'FOR' :
-                         komiteFlertall.harFlertall === 'mot' ? 'MOT' : '?'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {flertall && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-500 w-20 shrink-0">Stortinget</span>
-                    <div className="flex-1">
-                      <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
-                        {flertall.forMandater > 0 && (
-                          <div className="bg-emerald-400" style={{ width: `${flertall.prosentFor}%` }} />
-                        )}
-                        {flertall.motMandater > 0 && (
-                          <div className="bg-red-400" style={{ width: `${flertall.prosentMot}%` }} />
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-gray-500">
-                        {flertall.forMandater}/{flertall.motMandater}
-                        {flertall.ukjentMandater > 0 && <span className="text-gray-300">/{flertall.ukjentMandater}</span>}
-                      </span>
-                      <span className={`text-xs font-medium ${
-                        flertall.harFlertall === 'for' ? 'text-emerald-600' :
-                        flertall.harFlertall === 'mot' ? 'text-red-600' :
-                        'text-gray-400'
-                      }`}>
-                        {flertall.harFlertall === 'for' ? 'FOR' :
-                         flertall.harFlertall === 'mot' ? 'MOT' : '?'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {omvendtFlertall && (
-                  <div className="flex items-center gap-2 mt-1 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
-                    <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                    </svg>
-                    <span className="text-xs text-amber-700">Omvendt flertall — komiteen og Stortinget peker i ulik retning</span>
-                  </div>
-                )}
+                  )
+                })}
               </div>
-            )}
-          </div>
+
+              {/* Flertall */}
+              {(komiteFlertall || flertall) && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Flertall</h4>
+
+                  {komiteFlertall && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-20 shrink-0">{sak.komiteer?.navn || 'Komité'}</span>
+                      <div className="flex-1">
+                        <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+                          {komiteFlertall.forMandater > 0 && (
+                            <div className="bg-emerald-400" style={{ width: `${komiteFlertall.prosentFor}%` }} />
+                          )}
+                          {komiteFlertall.motMandater > 0 && (
+                            <div className="bg-red-400" style={{ width: `${komiteFlertall.prosentMot}%` }} />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-gray-500">
+                          {komiteFlertall.forMandater}/{komiteFlertall.motMandater}
+                          {komiteFlertall.ukjentMandater > 0 && <span className="text-gray-300">/{komiteFlertall.ukjentMandater}</span>}
+                        </span>
+                        <span className={`text-xs font-medium ${
+                          komiteFlertall.harFlertall === 'for' ? 'text-emerald-600' :
+                          komiteFlertall.harFlertall === 'mot' ? 'text-red-600' :
+                          'text-gray-400'
+                        }`}>
+                          {komiteFlertall.harFlertall === 'for' ? 'FOR' :
+                           komiteFlertall.harFlertall === 'mot' ? 'MOT' : '?'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {flertall && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-20 shrink-0">Stortinget</span>
+                      <div className="flex-1">
+                        <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+                          {flertall.forMandater > 0 && (
+                            <div className="bg-emerald-400" style={{ width: `${flertall.prosentFor}%` }} />
+                          )}
+                          {flertall.motMandater > 0 && (
+                            <div className="bg-red-400" style={{ width: `${flertall.prosentMot}%` }} />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-gray-500">
+                          {flertall.forMandater}/{flertall.motMandater}
+                          {flertall.ukjentMandater > 0 && <span className="text-gray-300">/{flertall.ukjentMandater}</span>}
+                        </span>
+                        <span className={`text-xs font-medium ${
+                          flertall.harFlertall === 'for' ? 'text-emerald-600' :
+                          flertall.harFlertall === 'mot' ? 'text-red-600' :
+                          'text-gray-400'
+                        }`}>
+                          {flertall.harFlertall === 'for' ? 'FOR' :
+                           flertall.harFlertall === 'mot' ? 'MOT' : '?'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {omvendtFlertall && (
+                    <div className="flex items-center gap-2 mt-1 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+                      <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                      </svg>
+                      <span className="text-xs text-amber-700">Omvendt flertall — komiteen og Stortinget peker i ulik retning</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <p className="text-sm text-gray-400 italic">Departementssak — partistemmer er ikke relevant</p>
+            </div>
+          )}
 
           {/* Delsaker */}
           {!sak.forelder_id && (
