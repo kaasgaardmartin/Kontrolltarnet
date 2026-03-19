@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { PARTIER, type Stemme } from '@/lib/types'
-import { gjenopprettSak, type SakMedStemmer } from '@/lib/actions'
+import { useState } from 'react'
+import { gjenopprettSak, slettSak, type SakMedStemmer } from '@/lib/actions'
 import { beregnFlertall, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
 import { useArkiverteSaker, useMandater, useInvaliderSakData } from '@/lib/queries'
 
@@ -22,11 +23,18 @@ export default function ArkivPage() {
   const { data: saker = [], isLoading: lasterSaker } = useArkiverteSaker()
   const { data: mandater = [], isLoading: lasterMandater } = useMandater()
   const { invaliderSaker } = useInvaliderSakData()
+  const [bekreftSlettId, setBekreftSlettId] = useState<string | null>(null)
 
   const laster = lasterSaker || lasterMandater
 
   async function handleGjenopprett(sakId: string) {
     await gjenopprettSak(sakId)
+    invaliderSaker()
+  }
+
+  async function handleSlett(sakId: string) {
+    await slettSak(sakId)
+    setBekreftSlettId(null)
     invaliderSaker()
   }
 
@@ -110,12 +118,38 @@ export default function ArkivPage() {
                         ) : '–'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleGjenopprett(sak.id)}
-                          className="text-xs text-[#4A9EDB] hover:underline"
-                        >
-                          Gjenopprett
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => handleGjenopprett(sak.id)}
+                            className="text-xs text-[#4A9EDB] hover:underline"
+                          >
+                            Gjenopprett
+                          </button>
+                          {bekreftSlettId === sak.id ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-xs text-red-600">Slette?</span>
+                              <button
+                                onClick={() => handleSlett(sak.id)}
+                                className="text-xs text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded transition-colors"
+                              >
+                                Ja
+                              </button>
+                              <button
+                                onClick={() => setBekreftSlettId(null)}
+                                className="text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                Nei
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setBekreftSlettId(sak.id)}
+                              className="text-xs text-red-400 hover:text-red-600 hover:underline transition-colors"
+                            >
+                              Slett
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
