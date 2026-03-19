@@ -74,8 +74,8 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
     sak?.stortingssak_ref ?? fd?.stortingssak_ref ?? (imp ? `https://www.stortinget.no/no/Saker-og-publikasjoner/Saker/Sak/?p=${imp.id}` : '')
   )
   const [sesjon, setSesjon] = useState(sak?.sesjon ?? fd?.sesjon ?? '')
-  const [komiteDato, setKomiteDato] = useState(sak?.komite_dato ?? fd?.komite_dato ?? '')
-  const [stortingsDato, setStortingsDato] = useState(sak?.stortings_dato ?? fd?.stortings_dato ?? '')
+  const [komiteDato, setKomiteDato] = useState(sak?.komite_dato ?? fd?.komite_dato ?? imp?.innstilling_dato ?? '')
+  const [stortingsDato, setStortingsDato] = useState(sak?.stortings_dato ?? fd?.stortings_dato ?? imp?.behandling_dato ?? '')
   const [stemmer, setStemmer] = useState<Record<string, Stemme>>(() => {
     const initial: Record<string, Stemme> = {}
     for (const p of PARTIER) {

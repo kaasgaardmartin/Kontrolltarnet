@@ -17,6 +17,8 @@ export interface StortingetSak {
   henvisning: string | null
   sist_oppdatert: string | null
   emner: string[]
+  innstilling_dato: string | null  // Dato for komitéinnstilling (AVGITT)
+  behandling_dato: string | null   // Dato for behandling i salen (BEHS)
 }
 
 function extractText(xml: string, tag: string): string | null {
@@ -33,6 +35,29 @@ function extractAll(xml: string, tag: string): string[] {
     matches.push(m[1].trim())
   }
   return matches
+}
+
+// Parser norsk dato "dd.MM.yyyy HH:mm:ss" til ISO "yyyy-MM-dd"
+function parseNorskDato(dato: string | null): string | null {
+  if (!dato) return null
+  const match = dato.match(/^(\d{2})\.(\d{2})\.(\d{4})/)
+  if (!match) return null
+  return `${match[3]}-${match[2]}-${match[1]}`
+}
+
+// Henter dato for en spesifikk saksgang-hendelse (f.eks. AVGITT, BEHS)
+function extractHendelseDato(sakXml: string, hendelseId: string): string | null {
+  const hendelseRegex = /<saksgang_hendelse>([\s\S]*?)<\/saksgang_hendelse>/g
+  let m
+  while ((m = hendelseRegex.exec(sakXml)) !== null) {
+    const block = m[1]
+    const id = extractText(block, 'id')
+    if (id === hendelseId) {
+      const dato = extractText(block, 'dato')
+      return parseNorskDato(dato)
+    }
+  }
+  return null
 }
 
 function parseSak(sakXml: string): StortingetSak {
@@ -62,6 +87,10 @@ function parseSak(sakXml: string): StortingetSak {
     emner.push(...navnMatches)
   }
 
+  // Datoer fra saksgang-hendelser
+  const innstilling_dato = extractHendelseDato(sakXml, 'AVGITT')  // Komité avgir innstilling
+  const behandling_dato = extractHendelseDato(sakXml, 'BEHS')     // Behandling i salen
+
   return {
     id,
     tittel,
@@ -74,6 +103,8 @@ function parseSak(sakXml: string): StortingetSak {
     henvisning,
     sist_oppdatert,
     emner,
+    innstilling_dato,
+    behandling_dato,
   }
 }
 
