@@ -25,7 +25,7 @@ interface Props {
   forelderId?: string | null  // for creating delsak
   forelderData?: ForelderData | null  // parent data for pre-filling
   importertStortingetSak?: StortingetSak | null  // data fra Stortinget-import
-  onLagret: () => void
+  onLagret: (sakId?: string) => void
   onLukk: () => void
 }
 
@@ -120,16 +120,22 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
       stemmer: PARTIER.map(p => ({ parti: p, stemme: stemmer[p] })),
     }
 
-    const result = erNy
-      ? await opprettSak(formData)
-      : await oppdaterSak(sak!.id, formData)
-
-    setLagrer(false)
-
-    if (result.success) {
-      onLagret()
+    if (erNy) {
+      const result = await opprettSak(formData)
+      setLagrer(false)
+      if (result.success) {
+        onLagret(result.sakId)
+      } else {
+        setFeil(result.error || 'Noe gikk galt')
+      }
     } else {
-      setFeil(result.error || 'Noe gikk galt')
+      const result = await oppdaterSak(sak!.id, formData)
+      setLagrer(false)
+      if (result.success) {
+        onLagret(sak!.id)
+      } else {
+        setFeil(result.error || 'Noe gikk galt')
+      }
     }
   }
 

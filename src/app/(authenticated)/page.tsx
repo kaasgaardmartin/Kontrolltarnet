@@ -12,6 +12,7 @@ import { useSaker, useMandater, useKomiteer, useKommendeAktiviteter, useInvalide
 import Sakstabell from '@/components/Sakstabell'
 import SakModal from '@/components/SakModal'
 import StortingetImport from '@/components/StortingetImport'
+import DelsakerSteg from '@/components/DelsakerSteg'
 
 type Filter = 'Alle' | 'Storting' | 'Departement' | 'Intern' | 'Behandles snart'
 
@@ -34,6 +35,7 @@ export default function Forsiden() {
   const [modalSak, setModalSak] = useState<SakMedStemmer | null | undefined>(undefined)
   const [visStortingetImport, setVisStortingetImport] = useState(false)
   const [importertSak, setImportertSak] = useState<StortingetSak | null>(null)
+  const [delsakerSteg, setDelsakerSteg] = useState<{ sakId: string; tittel: string } | null>(null)
 
   const { invaliderSaker } = useInvaliderSakData()
 
@@ -289,10 +291,16 @@ export default function Forsiden() {
         <SakModal
           sak={modalSak}
           komiteer={komiteer}
-          onLagret={() => {
+          onLagret={(sakId) => {
+            const varImport = !!importertSak
+            const tittel = importertSak?.korttittel || importertSak?.tittel || ''
             setModalSak(undefined)
             setImportertSak(null)
             invaliderSaker()
+            // Vis delsaker-steg etter Stortinget-import
+            if (varImport && sakId) {
+              setDelsakerSteg({ sakId, tittel })
+            }
           }}
           onLukk={() => {
             setModalSak(undefined)
@@ -311,6 +319,21 @@ export default function Forsiden() {
             setModalSak(null) // null = ny sak, men med prefill fra importertSak
           }}
           onLukk={() => setVisStortingetImport(false)}
+        />
+      )}
+
+      {/* Delsaker-steg etter Stortinget-import */}
+      {delsakerSteg && (
+        <DelsakerSteg
+          forelderId={delsakerSteg.sakId}
+          forelderTittel={delsakerSteg.tittel}
+          onFerdig={() => {
+            setDelsakerSteg(null)
+            invaliderSaker()
+          }}
+          onLukk={() => {
+            setDelsakerSteg(null)
+          }}
         />
       )}
     </div>

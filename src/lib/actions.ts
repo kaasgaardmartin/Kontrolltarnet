@@ -111,7 +111,7 @@ export async function hentKomiteer() {
   return data ?? []
 }
 
-export async function opprettSak(formData: SakFormData): Promise<{ success: boolean; error?: string }> {
+export async function opprettSak(formData: SakFormData): Promise<{ success: boolean; error?: string; sakId?: string }> {
   const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
@@ -185,7 +185,7 @@ export async function opprettSak(formData: SakFormData): Promise<{ success: bool
   // Auto-subscribe creator
   await autoAbonner(bruker.id, sak.id)
 
-  return { success: true }
+  return { success: true, sakId: sak.id }
 }
 
 export async function oppdaterSak(sakId: string, formData: SakFormData): Promise<{ success: boolean; error?: string }> {
