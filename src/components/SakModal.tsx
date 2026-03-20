@@ -83,6 +83,9 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
     }
     return initial
   })
+  const [horingsfrist, setHoringsfrist] = useState(sak?.horingsfrist ?? '')
+  const [horingsnotatUrl, setHoringsnotatUrl] = useState(sak?.horingsnotat_url ?? '')
+  const [horingssvarUrl, setHoringssvarUrl] = useState(sak?.horingssvar_url ?? '')
   const [lagrer, setLagrer] = useState(false)
   const [sletter, setSletter] = useState(false)
   const [feil, setFeil] = useState('')
@@ -117,6 +120,9 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
       komite_dato: komiteDato || null,
       stortings_dato: stortingsDato || null,
       forelder_id: forelderId || null,
+      horingsfrist: horingsfrist || null,
+      horingsnotat_url: horingsnotatUrl.trim() || null,
+      horingssvar_url: horingssvarUrl.trim() || null,
       stemmer: PARTIER.map(p => ({ parti: p, stemme: stemmer[p] })),
     }
 
@@ -254,7 +260,7 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Stortingsreferanse (lenke)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Saksreferanse (lenke)</label>
               <div className="relative">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.28" />
@@ -301,6 +307,50 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
                 onChange={e => setStortingsDato(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
               />
+            </div>
+          </div>
+
+          {/* Høring */}
+          <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50/30">
+            <label className="block text-sm font-medium text-gray-700">Høring</label>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Høringsfrist</label>
+              <input
+                type="date"
+                value={horingsfrist}
+                onChange={e => setHoringsfrist(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Lenke til høringsnotat</label>
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+                <input
+                  type="url"
+                  value={horingsnotatUrl}
+                  onChange={e => setHoringsnotatUrl(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                  placeholder="https://www.regjeringen.no/..."
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Lenke til vårt høringssvar</label>
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                </svg>
+                <input
+                  type="url"
+                  value={horingssvarUrl}
+                  onChange={e => setHoringssvarUrl(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                  placeholder="https://..."
+                />
+              </div>
             </div>
           </div>
 

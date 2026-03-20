@@ -3,13 +3,14 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PARTIER, type Stemme } from '@/lib/types'
-import { arkiverSak, registrerUtfall, toggleSakAbonnement, type SakMedStemmer } from '@/lib/actions'
+import { arkiverSak, registrerUtfall, toggleSakAbonnement, endreSakNiva, type SakMedStemmer } from '@/lib/actions'
 import { beregnFlertall, harOmvendtFlertall, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
 import { useSak, useMandater, useKomiteMandater, useKomiteer, useOrgBrukere, useSakAbonnement, useInvaliderSakData } from '@/lib/queries'
 import NotatSeksjon from '@/components/NotatSeksjon'
 import LenkeSeksjon from '@/components/LenkeSeksjon'
 import StakeholderSeksjon from '@/components/StakeholderSeksjon'
 import AktivitetSeksjon from '@/components/AktivitetSeksjon'
+import TidslinjeSeksjon from '@/components/TidslinjeSeksjon'
 import SakModal from '@/components/SakModal'
 
 const STEMME_STIL: Record<Stemme, { bg: string; text: string; label: string }> = {
@@ -51,6 +52,7 @@ export default function SakDetaljSide() {
   const [redigerDelsak, setRedigerDelsak] = useState<SakMedStemmer | null>(null)
   const [bekreftArkiver, setBekreftArkiver] = useState(false)
   const [registrererUtfall, setRegistrererUtfall] = useState(false)
+  const [bekreftFlyttTilStorting, setBekreftFlyttTilStorting] = useState(false)
 
   const { invaliderSak, invaliderSaker, invaliderVarsler } = useInvaliderSakData()
 
@@ -307,8 +309,8 @@ export default function SakDetaljSide() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: Partistemmer + Flertall + Delsaker */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Partistemmer — skjules for departementssaker */}
-          {sak.niva !== 'departement' ? (
+          {/* Partistemmer for stortingssaker, tidslinje for andre */}
+          {sak.niva === 'storting' ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
               <h3 className="text-sm font-semibold text-[#0F1923] mb-3">Partistemmer</h3>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -403,7 +405,55 @@ export default function SakDetaljSide() {
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-              <p className="text-sm text-gray-400 italic">Departementssak — partistemmer er ikke relevant</p>
+              <TidslinjeSeksjon
+                sakId={sakId}
+                aktiviteter={sak.aktiviteter ?? []}
+                sakStakeholders={sak.sak_stakeholders ?? []}
+                brukere={orgBrukere}
+                komiteDato={sak.komite_dato}
+                stortingsDato={sak.stortings_dato}
+                horingsfrist={sak.horingsfrist}
+                horingsnotatUrl={sak.horingsnotat_url}
+                horingssvarUrl={sak.horingssvar_url}
+                onOppdatert={lastData}
+                kanRedigere={true}
+              />
+
+              {/* Flytt til Storting */}
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                {!bekreftFlyttTilStorting ? (
+                  <button
+                    onClick={() => setBekreftFlyttTilStorting(true)}
+                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#4A9EDB] transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21" />
+                    </svg>
+                    Flytt til Storting
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-gray-500">Saken flyttes til stortingsnivå med stemmevisning.</span>
+                    <button
+                      onClick={async () => {
+                        await endreSakNiva(sakId, 'storting')
+                        invaliderSak(sakId)
+                        invaliderSaker()
+                        setBekreftFlyttTilStorting(false)
+                      }}
+                      className="text-xs px-2.5 py-1 bg-[#4A9EDB] text-white rounded hover:bg-[#3a8ecb] transition-colors"
+                    >
+                      Bekreft
+                    </button>
+                    <button
+                      onClick={() => setBekreftFlyttTilStorting(false)}
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      Avbryt
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -493,17 +543,19 @@ export default function SakDetaljSide() {
             />
           </div>
 
-          {/* Aktiviteter / Oppfølging */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <AktivitetSeksjon
-              sakId={sakId}
-              aktiviteter={sak.aktiviteter ?? []}
-              sakStakeholders={sak.sak_stakeholders ?? []}
-              brukere={orgBrukere}
-              onOppdatert={lastData}
-              kanRedigere={true}
-            />
-          </div>
+          {/* Aktiviteter / Oppfølging — kun for stortingssaker (tidslinje håndterer dette for andre) */}
+          {sak.niva === 'storting' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <AktivitetSeksjon
+                sakId={sakId}
+                aktiviteter={sak.aktiviteter ?? []}
+                sakStakeholders={sak.sak_stakeholders ?? []}
+                brukere={orgBrukere}
+                onOppdatert={lastData}
+                kanRedigere={true}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right sidebar: Noter + Lenker */}

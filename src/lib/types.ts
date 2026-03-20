@@ -52,6 +52,9 @@ export interface Sak {
   arkivert_dato: string | null
   forelder_id: string | null
   sesjon: string | null
+  horingsfrist: string | null
+  horingsnotat_url: string | null
+  horingssvar_url: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -152,6 +155,7 @@ export interface Varsel {
   id: string
   bruker_id: string
   sak_id: string | null
+  aktivitet_id: string | null
   type: VarselType
   melding: string
   lest: boolean

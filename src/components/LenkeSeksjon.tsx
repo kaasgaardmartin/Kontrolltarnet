@@ -33,6 +33,14 @@ const LENKE_TYPER: { value: LenkeType; label: string }[] = [
   { value: 'sosiale medier', label: 'Sosiale medier' },
 ]
 
+function sikkerUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    if (['http:', 'https:'].includes(parsed.protocol)) return url
+  } catch { /* ugyldig URL */ }
+  return '#'
+}
+
 export default function LenkeSeksjon({ sakId, lenker, onOppdatert, kanRedigere }: Props) {
   const [visSkjema, setVisSkjema] = useState(false)
   const [tittel, setTittel] = useState('')
@@ -127,7 +135,7 @@ export default function LenkeSeksjon({ sakId, lenker, onOppdatert, kanRedigere }
                     {lenke.type}
                   </span>
                   <a
-                    href={lenke.url}
+                    href={sikkerUrl(lenke.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-[#4A9EDB] hover:underline truncate"

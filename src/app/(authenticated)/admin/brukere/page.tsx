@@ -92,7 +92,7 @@ export default function BrukereAdminPage() {
         <h1 className="text-2xl font-bold text-gray-900">Brukere</h1>
         <p className="text-sm text-gray-500 mt-1">
           Administrer brukere i organisasjonen. Nye brukere med @advokatforeningen.no-epost
-          får automatisk tilgang som leser.
+          får automatisk tilgang som redaktør.
         </p>
       </div>
 

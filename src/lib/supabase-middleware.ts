@@ -35,9 +35,26 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/auth')
   ) {
+    // Tillat uautentisert tilgang til Stortinget API — FJERNET.
+    // API-ruter krever nå også autentisering.
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
+  }
+
+  // Server-side admin-sjekk for /admin-ruter
+  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+    const { data: bruker } = await supabase
+      .from('brukere')
+      .select('rolle')
+      .eq('id', user.id)
+      .single()
+
+    if (!bruker || bruker.rolle !== 'org-admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

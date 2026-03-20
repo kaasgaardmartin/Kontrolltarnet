@@ -5,6 +5,28 @@ import { PARTIER, type Stemme } from '@/lib/types'
 import { beregnFlertall, type Mandatfordeling, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
 import type { SakMedStemmer } from '@/lib/actions'
 
+function beregnDagerTil(dato: string): number {
+  const d = new Date(dato)
+  const idag = new Date()
+  d.setHours(0, 0, 0, 0)
+  idag.setHours(0, 0, 0, 0)
+  return Math.ceil((d.getTime() - idag.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function fristFarge(dager: number): string {
+  if (dager < 0) return 'text-red-600 font-medium'
+  if (dager === 0) return 'text-orange-600 font-medium'
+  if (dager <= 3) return 'text-amber-600'
+  return 'text-gray-500'
+}
+
+function fristKortTekst(dager: number): string {
+  if (dager < 0) return `${Math.abs(dager)}d siden`
+  if (dager === 0) return 'i dag'
+  if (dager === 1) return 'i morgen'
+  return `om ${dager}d`
+}
+
 interface Props {
   saker: SakMedStemmer[]
   mandater: Mandatfordeling[]
@@ -149,9 +171,49 @@ function SaksRad({
           </span>
         )}
       </td>
-      {sak.niva === 'departement' ? (
-        <td colSpan={PARTIER.length + 1} className="px-3 py-3 text-center">
-          <span className="text-xs text-gray-400 italic">Departementssak — ingen partistemmer</span>
+      {sak.niva !== 'storting' ? (
+        <td colSpan={erDelsak ? PARTIER.length + 1 : 1} className="px-3 py-3">
+          <div className="flex items-center gap-3 justify-center flex-wrap">
+            {/* Neste frist */}
+            {sak.aktivitet_oppsummering?.nesteFrist ? (() => {
+              const dager = beregnDagerTil(sak.aktivitet_oppsummering.nesteFrist)
+              const dato = new Date(sak.aktivitet_oppsummering.nesteFrist).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })
+              return (
+                <span className={`inline-flex items-center gap-1 text-xs ${fristFarge(dager)}`}>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  {dato} ({fristKortTekst(dager)})
+                </span>
+              )
+            })() : null}
+            {/* Antall oppgaver */}
+            {sak.aktivitet_oppsummering && sak.aktivitet_oppsummering.antallPlanlagte > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                {sak.aktivitet_oppsummering.antallPlanlagte} oppgave{sak.aktivitet_oppsummering.antallPlanlagte !== 1 ? 'r' : ''}
+              </span>
+            )}
+            {/* Høringsfrist */}
+            {sak.horingsfrist ? (() => {
+              const dager = beregnDagerTil(sak.horingsfrist)
+              const dato = new Date(sak.horingsfrist).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })
+              return (
+                <span className={`inline-flex items-center gap-1 text-xs ${fristFarge(dager)}`}>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  </svg>
+                  Høring {dato}
+                </span>
+              )
+            })() : null}
+            {/* Fallback hvis ingen data */}
+            {!sak.aktivitet_oppsummering?.nesteFrist && !sak.horingsfrist && (!sak.aktivitet_oppsummering || sak.aktivitet_oppsummering.antallPlanlagte === 0) && (
+              <span className="text-xs text-gray-300 italic">Ingen frister</span>
+            )}
+          </div>
         </td>
       ) : (
         <>
@@ -205,30 +267,83 @@ export default function Sakstabell({ saker, mandater, onKlikk }: Props) {
     )
   }
 
+  const stortingssaker = saker.filter(s => s.niva === 'storting')
+  const andreSaker = saker.filter(s => s.niva !== 'storting')
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50/50">
-              <th className="text-left px-4 py-3 font-medium text-gray-600 min-w-[200px]">Sak</th>
-              <th className="text-left px-2 py-3 font-medium text-gray-600 w-16">Nivå</th>
-              <th className="text-left px-2 py-3 font-medium text-gray-600 w-20">Landing</th>
-              {PARTIER.map(parti => (
-                <th key={parti} className="text-center px-1 py-3 font-medium text-gray-600 w-10">
-                  <span className="text-xs">{parti}</span>
-                </th>
-              ))}
-              <th className="text-center px-3 py-3 font-medium text-gray-600 w-24">Flertall</th>
-            </tr>
-          </thead>
-          <tbody>
-            {saker.map(sak => (
-              <SaksRadMedDelsaker key={sak.id} sak={sak} mandater={mandater} onKlikk={onKlikk} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="space-y-6">
+      {/* Stortingssaker */}
+      {stortingssaker.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-4 h-4 text-[#0F1923]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21" />
+            </svg>
+            <h2 className="text-sm font-semibold text-[#0F1923]">
+              Stortingssaker
+              <span className="text-gray-400 font-normal ml-1">({stortingssaker.length})</span>
+            </h2>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50/50">
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 min-w-[200px]">Sak</th>
+                    <th className="text-left px-2 py-3 font-medium text-gray-600 w-16">Nivå</th>
+                    <th className="text-left px-2 py-3 font-medium text-gray-600 w-20">Landing</th>
+                    {PARTIER.map(parti => (
+                      <th key={parti} className="text-center px-1 py-3 font-medium text-gray-600 w-10">
+                        <span className="text-xs">{parti}</span>
+                      </th>
+                    ))}
+                    <th className="text-center px-3 py-3 font-medium text-gray-600 w-24">Flertall</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stortingssaker.map(sak => (
+                    <SaksRadMedDelsaker key={sak.id} sak={sak} mandater={mandater} onKlikk={onKlikk} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Departement & interne saker */}
+      {andreSaker.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-4 h-4 text-[#0F1923]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
+            </svg>
+            <h2 className="text-sm font-semibold text-[#0F1923]">
+              Departement & interne saker
+              <span className="text-gray-400 font-normal ml-1">({andreSaker.length})</span>
+            </h2>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50/50">
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 min-w-[200px]">Sak</th>
+                    <th className="text-left px-2 py-3 font-medium text-gray-600 w-16">Nivå</th>
+                    <th className="text-left px-2 py-3 font-medium text-gray-600 w-20">Landing</th>
+                    <th className="text-center px-3 py-3 font-medium text-gray-600">Frister & oppgaver</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {andreSaker.map(sak => (
+                    <SaksRadMedDelsaker key={sak.id} sak={sak} mandater={mandater} onKlikk={onKlikk} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

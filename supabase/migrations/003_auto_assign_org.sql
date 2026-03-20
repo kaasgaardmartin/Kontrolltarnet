@@ -29,7 +29,7 @@ BEGIN
   -- If org found, auto-assign user as 'leser'
   IF org_id IS NOT NULL THEN
     INSERT INTO brukere (id, organisasjon_id, navn, epost, rolle)
-    VALUES (NEW.id, org_id, user_navn, NEW.email, 'leser');
+    VALUES (NEW.id, org_id, user_navn, NEW.email, 'redaktør');
   END IF;
 
   -- If no org found, user will land on the waiting list page

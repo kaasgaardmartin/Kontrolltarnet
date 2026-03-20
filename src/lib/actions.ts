@@ -3,10 +3,46 @@
 import { createServerSupabaseClient } from './supabase-server'
 import type { Sak, PartiStemme, Stemme, Niva, Landing, Notat, Lenke, LenkeType, Komite, KomiteMandat, Rolle, Bruker, Stakeholder, SakStakeholder, Aktivitet, StakeholderType, Holdning, Innflytelse, AktivitetType, AktivitetStatus, Varsel, VarselType } from './types'
 
+// ============================================================
+// Input-validering hjelpefunksjoner
+// ============================================================
+
+const MAX_TITTEL = 300
+const MAX_BESKRIVELSE = 5000
+const MAX_NOTAT = 10000
+const MAX_URL = 2048
+const MAX_NAVN = 200
+
+function validerTekst(tekst: string, maxLength: number, feltnavn: string): string | null {
+  if (!tekst || tekst.trim().length === 0) return `${feltnavn} kan ikke være tom`
+  if (tekst.length > maxLength) return `${feltnavn} kan ikke være lengre enn ${maxLength} tegn`
+  return null
+}
+
+function validerUrl(url: string): string | null {
+  if (!url || url.trim().length === 0) return 'URL kan ikke være tom'
+  if (url.length > MAX_URL) return `URL kan ikke være lengre enn ${MAX_URL} tegn`
+  try {
+    const parsed = new URL(url)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return 'URL må starte med http:// eller https://'
+    }
+  } catch {
+    return 'Ugyldig URL-format'
+  }
+  return null
+}
+
+export interface AktivitetOppsummering {
+  antallPlanlagte: number
+  nesteFrist: string | null
+}
+
 export interface SakMedStemmer extends Sak {
   partistemmer: PartiStemme[]
   delsaker?: SakMedStemmer[]
   stakeholder_navn?: string[]
+  aktivitet_oppsummering?: AktivitetOppsummering
 }
 
 export interface SakFormData {
@@ -20,6 +56,9 @@ export interface SakFormData {
   stortings_dato: string | null
   forelder_id?: string | null
   sesjon?: string | null
+  horingsfrist?: string | null
+  horingsnotat_url?: string | null
+  horingssvar_url?: string | null
   stemmer: { parti: string; stemme: Stemme }[]
 }
 
@@ -34,6 +73,40 @@ export async function hentBrukerOgOrg() {
     .eq('id', user.id)
     .single()
 
+  // Fallback: Hvis brukeren finnes i auth men ikke i brukere-tabellen
+  // (trigger feilet), opprett brukeren her basert på e-postdomenet
+  if (!bruker && user.email) {
+    const domain = user.email.split('@')[1]?.toLowerCase()
+    if (domain) {
+      const { data: org } = await supabase
+        .from('organisasjoner')
+        .select('id')
+        .eq('domene', domain)
+        .single()
+
+      if (org) {
+        const navn = user.user_metadata?.navn
+          || user.user_metadata?.full_name
+          || user.user_metadata?.name
+          || user.email.split('@')[0]
+
+        const { data: nyBruker } = await supabase
+          .from('brukere')
+          .insert({
+            id: user.id,
+            organisasjon_id: org.id,
+            navn,
+            epost: user.email,
+            rolle: 'redaktør',
+          })
+          .select('id, organisasjon_id, rolle')
+          .single()
+
+        return nyBruker
+      }
+    }
+  }
+
   return bruker
 }
 
@@ -42,10 +115,10 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return []
 
-  // Fetch all non-archived saker with their votes and stakeholder names
+  // Fetch all non-archived saker with their votes, stakeholder names, and activities
   const { data: alleSaker } = await supabase
     .from('saker')
-    .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn))')
+    .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn)), aktiviteter(frist, status)')
     .eq('organisasjon_id', bruker.organisasjon_id)
     .eq('arkivert', false)
     .order('updated_at', { ascending: false })
@@ -55,8 +128,21 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
     const stakeholder_navn = sakStakeholders
       .map(ss => ss.stakeholders?.navn)
       .filter((n): n is string => !!n)
-    const { sak_stakeholders: _ss, ...rest } = s
-    return { ...rest, stakeholder_navn } as SakMedStemmer
+
+    // Beregn aktivitet-oppsummering
+    const aktiviteter = (s.aktiviteter ?? []) as { frist: string | null; status: string }[]
+    const planlagte = aktiviteter.filter(a => a.status === 'planlagt')
+    const frister = planlagte
+      .map(a => a.frist)
+      .filter((f): f is string => !!f)
+      .sort()
+    const aktivitet_oppsummering: AktivitetOppsummering = {
+      antallPlanlagte: planlagte.length,
+      nesteFrist: frister.length > 0 ? frister[0] : null,
+    }
+
+    const { sak_stakeholders: _ss, aktiviteter: _ak, ...rest } = s
+    return { ...rest, stakeholder_navn, aktivitet_oppsummering } as SakMedStemmer
   })
 
   // Separate into hovedsaker (no parent) and delsaker (has parent)
@@ -117,6 +203,14 @@ export async function opprettSak(formData: SakFormData): Promise<{ success: bool
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  // Input-validering
+  const tittelFeil = validerTekst(formData.tittel, MAX_TITTEL, 'Tittel')
+  if (tittelFeil) return { success: false, error: tittelFeil }
+  if (formData.beskrivelse) {
+    const beskFeil = validerTekst(formData.beskrivelse, MAX_BESKRIVELSE, 'Beskrivelse')
+    if (beskFeil) return { success: false, error: beskFeil }
+  }
+
   // If creating a delsak, inherit fields from parent
   let arvKomiteId = formData.komite_id
   let arvStortingssakRef = formData.stortingssak_ref
@@ -156,6 +250,9 @@ export async function opprettSak(formData: SakFormData): Promise<{ success: bool
       stortings_dato: arvStortingsDato || null,
       forelder_id: formData.forelder_id || null,
       sesjon: arvSesjon || null,
+      horingsfrist: formData.horingsfrist || null,
+      horingsnotat_url: formData.horingsnotat_url || null,
+      horingssvar_url: formData.horingssvar_url || null,
       created_by: bruker.id,
       eier_id: bruker.id,
     })
@@ -213,6 +310,9 @@ export async function oppdaterSak(sakId: string, formData: SakFormData): Promise
       komite_dato: formData.komite_dato || null,
       stortings_dato: formData.stortings_dato || null,
       sesjon: formData.sesjon || null,
+      horingsfrist: formData.horingsfrist || null,
+      horingsnotat_url: formData.horingsnotat_url || null,
+      horingssvar_url: formData.horingssvar_url || null,
     })
     .eq('id', sakId)
 
@@ -329,6 +429,9 @@ export async function leggTilNotat(sakId: string, tekst: string): Promise<{ succ
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  const notatFeil = validerTekst(tekst, MAX_NOTAT, 'Notat')
+  if (notatFeil) return { success: false, error: notatFeil }
+
   const { error } = await supabase.from('noter').insert({
     sak_id: sakId,
     organisasjon_id: bruker.organisasjon_id,
@@ -357,6 +460,11 @@ export async function leggTilLenke(
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  const tittelFeil = validerTekst(tittel, MAX_TITTEL, 'Tittel')
+  if (tittelFeil) return { success: false, error: tittelFeil }
+  const urlFeil = validerUrl(url)
+  if (urlFeil) return { success: false, error: urlFeil }
+
   const { error } = await supabase.from('lenker').insert({
     sak_id: sakId,
     organisasjon_id: bruker.organisasjon_id,
@@ -377,6 +485,21 @@ export async function slettLenke(lenkeId: string): Promise<{ success: boolean; e
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
   const { error } = await supabase.from('lenker').delete().eq('id', lenkeId)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function endreSakNiva(sakId: string, niva: 'storting' | 'departement' | 'intern'): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { error } = await supabase
+    .from('saker')
+    .update({ niva })
+    .eq('id', sakId)
+
   if (error) return { success: false, error: error.message }
   return { success: true }
 }
@@ -645,6 +768,9 @@ export async function opprettStakeholder(
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  const navnFeil = validerTekst(navn, MAX_NAVN, 'Navn')
+  if (navnFeil) return { success: false, error: navnFeil }
+
   const { data, error } = await supabase
     .from('stakeholders')
     .insert({
@@ -720,6 +846,44 @@ export async function fjernSakStakeholder(id: string): Promise<{ success: boolea
 }
 
 // ============================================================
+// Høring
+// ============================================================
+
+export async function oppdaterHoring(
+  sakId: string,
+  data: {
+    horingsfrist?: string | null
+    horingsnotat_url?: string | null
+    horingssvar_url?: string | null
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  if (data.horingsnotat_url) {
+    const urlFeil = validerUrl(data.horingsnotat_url)
+    if (urlFeil) return { success: false, error: `Høringsnotat: ${urlFeil}` }
+  }
+  if (data.horingssvar_url) {
+    const urlFeil = validerUrl(data.horingssvar_url)
+    if (urlFeil) return { success: false, error: `Høringssvar: ${urlFeil}` }
+  }
+
+  const { error } = await supabase
+    .from('saker')
+    .update({
+      horingsfrist: data.horingsfrist || null,
+      horingsnotat_url: data.horingsnotat_url || null,
+      horingssvar_url: data.horingssvar_url || null,
+    })
+    .eq('id', sakId)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
 // Aktiviteter
 // ============================================================
 
@@ -738,7 +902,10 @@ export async function opprettAktivitet(
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
-  const { error } = await supabase.from('aktiviteter').insert({
+  const beskFeil = validerTekst(aktivitetData.beskrivelse, MAX_BESKRIVELSE, 'Beskrivelse')
+  if (beskFeil) return { success: false, error: beskFeil }
+
+  const { data: nyAktivitet, error } = await supabase.from('aktiviteter').insert({
     sak_id: sakId,
     organisasjon_id: bruker.organisasjon_id,
     type: aktivitetData.type,
@@ -747,11 +914,13 @@ export async function opprettAktivitet(
     stakeholder_id: aktivitetData.stakeholder_id || null,
     ansvarlig_id: aktivitetData.ansvarlig_id || null,
     created_by: bruker.id,
-  })
+  }).select('id').single()
 
   if (error) return { success: false, error: error.message }
 
-  await opprettVarsler(sakId, 'aktivitet', `Ny aktivitet: ${aktivitetData.beskrivelse}`, bruker.id)
+  const aktivitetId = nyAktivitet?.id
+
+  await opprettVarsler(sakId, 'aktivitet', `Ny aktivitet: ${aktivitetData.beskrivelse}`, bruker.id, aktivitetId)
 
   // Notify assigned user directly
   if (aktivitetData.ansvarlig_id && aktivitetData.ansvarlig_id !== bruker.id) {
@@ -761,6 +930,7 @@ export async function opprettAktivitet(
       sak_id: sakId,
       type: 'tildelt' as const,
       melding: `Du er tildelt en oppgave: ${aktivitetData.beskrivelse}`,
+      aktivitet_id: aktivitetId,
     })
   }
 
@@ -792,7 +962,16 @@ export async function oppdaterAktivitetStatus(
 
   if (aktivitet?.sak_id) {
     const statusLabel = status === 'utført' ? 'utført' : status === 'avlyst' ? 'avlyst' : 'planlagt'
-    await opprettVarsler(aktivitet.sak_id, 'aktivitet', `Aktivitet ${statusLabel}: ${aktivitet.beskrivelse}`, bruker.id)
+    await opprettVarsler(aktivitet.sak_id, 'aktivitet', `Aktivitet ${statusLabel}: ${aktivitet.beskrivelse}`, bruker.id, aktivitetId)
+
+    // Mark old notifications about this activity as read (e.g. "tildelt" notifications)
+    if (status === 'utført' || status === 'avlyst') {
+      await supabase
+        .from('varsler')
+        .update({ lest: true })
+        .eq('aktivitet_id', aktivitetId)
+        .eq('lest', false)
+    }
   }
 
   return { success: true }
@@ -822,8 +1001,22 @@ export async function slettAktivitet(aktivitetId: string): Promise<{ success: bo
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  // Fetch info before deleting (for notification)
+  const { data: aktivitet } = await supabase
+    .from('aktiviteter')
+    .select('sak_id, beskrivelse')
+    .eq('id', aktivitetId)
+    .single()
+
+  // Delete activity — CASCADE on varsler.aktivitet_id removes related notifications automatically
   const { error } = await supabase.from('aktiviteter').delete().eq('id', aktivitetId)
   if (error) return { success: false, error: error.message }
+
+  // Notify subscribers that the activity was deleted
+  if (aktivitet?.sak_id) {
+    await opprettVarsler(aktivitet.sak_id, 'aktivitet', `Aktivitet slettet: ${aktivitet.beskrivelse}`, bruker.id)
+  }
+
   return { success: true }
 }
 
@@ -866,7 +1059,7 @@ export async function hentMineAktiviteter(): Promise<(Aktivitet & { saker: { id:
   const { data } = await supabase
     .from('aktiviteter')
     .select('*, stakeholders(navn), brukere:ansvarlig_id(navn), saker(id, tittel)')
-    .eq('ansvarlig_id', bruker.id)
+    .or(`ansvarlig_id.eq.${bruker.id},created_by.eq.${bruker.id}`)
     .order('status', { ascending: true })
     .order('frist', { ascending: true, nullsFirst: false })
 
@@ -881,7 +1074,8 @@ async function opprettVarsler(
   sakId: string,
   type: VarselType,
   melding: string,
-  ekskluderBrukerId: string
+  ekskluderBrukerId: string,
+  aktivitetId?: string
 ) {
   const supabase = await createServerSupabaseClient()
 
@@ -899,6 +1093,7 @@ async function opprettVarsler(
     sak_id: sakId,
     type,
     melding,
+    ...(aktivitetId ? { aktivitet_id: aktivitetId } : {}),
   }))
 
   await supabase.from('varsler').insert(varsler)

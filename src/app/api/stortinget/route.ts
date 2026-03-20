@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 // ============================================================
 // Stortinget API Proxy — henter saker fra data.stortinget.no
@@ -135,6 +136,16 @@ async function hentSakDetaljer(sakId: string): Promise<StortingetSak | null> {
 }
 
 export async function GET(request: NextRequest) {
+  // Autentiseringskontroll — kun innloggede brukere
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Ikke autentisert. Logg inn for å bruke dette endepunktet.' },
+      { status: 401 }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const sakId = searchParams.get('sakid')
   const sesjonId = searchParams.get('sesjon') || '2024-2025'

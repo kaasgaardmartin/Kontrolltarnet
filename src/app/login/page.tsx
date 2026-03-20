@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [navn, setNavn] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -22,6 +23,16 @@ export default function LoginPage() {
     setLoading(true)
 
     if (isSignUp) {
+      if (password.length < 8) {
+        setError('Passordet må være minst 8 tegn.')
+        setLoading(false)
+        return
+      }
+      if (password !== confirmPassword) {
+        setError('Passordene stemmer ikke overens.')
+        setLoading(false)
+        return
+      }
       const { error } = await signUp(email, password, navn)
       if (error) {
         setError(error.message)
@@ -123,11 +134,36 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={isSignUp ? 8 : 6}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
-                placeholder="Minst 6 tegn"
+                placeholder={isSignUp ? 'Minst 8 tegn' : 'Passord'}
               />
             </div>
+
+            {isSignUp && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  Bekreft passord
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent ${
+                    confirmPassword && confirmPassword !== password
+                      ? 'border-red-300 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
+                  placeholder="Skriv passordet på nytt"
+                />
+                {confirmPassword && confirmPassword !== password && (
+                  <p className="text-xs text-red-500 mt-1">Passordene stemmer ikke overens</p>
+                )}
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">
@@ -182,6 +218,7 @@ export default function LoginPage() {
                 setIsSignUp(!isSignUp)
                 setError(null)
                 setMessage(null)
+                setConfirmPassword('')
               }}
               className="text-sm text-[#4A9EDB] hover:underline"
             >
