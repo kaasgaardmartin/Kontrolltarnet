@@ -99,7 +99,16 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
     setValg(prev => ({ ...prev, [voteringId]: nyttValg }))
   }
 
-  function mapPartiStemmer(partier: PartiResultat[]): { parti: string; stemme: Stemme }[] {
+  function erEnstemmig(votering: Votering): boolean {
+    return votering.antall_for === -1 && votering.antall_mot === -1
+  }
+
+  function mapPartiStemmer(votering: Votering, partier: PartiResultat[]): { parti: string; stemme: Stemme }[] {
+    // Enstemmig vedtatt: alle partier stemte for
+    if (erEnstemmig(votering)) {
+      return PARTIER.map(p => ({ parti: p, stemme: (votering.vedtatt ? 'for' : 'mot') as Stemme }))
+    }
+
     return PARTIER.map(p => {
       const match = partier.find(pr => PARTI_MAP[pr.parti] === p)
       if (!match) return { parti: p, stemme: 'ukjent' as Stemme }
@@ -122,7 +131,7 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
       const v = valg[votering.votering_id]
       if (!v || v.type === 'ignorer') continue
 
-      const stemmer = mapPartiStemmer(partiData[votering.votering_id] ?? [])
+      const stemmer = mapPartiStemmer(votering, partiData[votering.votering_id] ?? [])
 
       if (v.type === 'hovedsak') {
         // Oppdater partistemmer på hovedsaken
@@ -258,7 +267,7 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
                     {v.vedtatt ? 'Vedtatt' : 'Ikke vedtatt'}
                   </span>
                   <span className="text-xs text-gray-400">
-                    {v.antall_for} for / {v.antall_mot} mot
+                    {erEnstemmig(v) ? 'Enstemmig' : `${v.antall_for} for / ${v.antall_mot} mot`}
                   </span>
                   {v.votering_tid && (
                     <span className="text-xs text-gray-400">
