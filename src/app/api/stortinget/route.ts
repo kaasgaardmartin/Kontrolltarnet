@@ -149,6 +149,8 @@ export interface StortingetVotering {
   antall_mot: number
   antall_ikke_tilstede: number
   votering_resultat_type: string
+  votering_resultat_tekst: string
+  kommentar: string | null
   partier?: StortingetPartiResultat[]
 }
 
@@ -171,6 +173,8 @@ function parseVotering(xml: string): StortingetVotering {
   const antall_mot = parseInt(extractText(xml, 'antall_mot') ?? '0', 10)
   const antall_ikke_tilstede = parseInt(extractText(xml, 'antall_ikke_tilstede') ?? '0', 10)
   const votering_resultat_type = extractText(xml, 'votering_resultat_type') ?? ''
+  const votering_resultat_tekst = extractText(xml, 'votering_resultat_tekst') ?? ''
+  const kommentar = extractText(xml, 'kommentar')
 
   return {
     votering_id,
@@ -182,6 +186,8 @@ function parseVotering(xml: string): StortingetVotering {
     antall_mot,
     antall_ikke_tilstede,
     votering_resultat_type,
+    votering_resultat_tekst,
+    kommentar,
   }
 }
 

@@ -388,6 +388,34 @@ export async function oppdaterSak(sakId: string, formData: SakFormData): Promise
   return { success: true }
 }
 
+// Oppdaterer kun partistemmer på en eksisterende sak (brukes ved voteringsimport)
+export async function oppdaterPartistemmer(
+  sakId: string,
+  stemmer: { parti: string; stemme: string }[]
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  for (const s of stemmer) {
+    await supabase
+      .from('partistemmer')
+      .upsert(
+        {
+          sak_id: sakId,
+          organisasjon_id: bruker.organisasjon_id,
+          parti: s.parti,
+          stemme: s.stemme,
+          updated_by: bruker.id,
+        },
+        { onConflict: 'sak_id,parti' }
+      )
+  }
+
+  return { success: true }
+}
+
 export async function slettSak(sakId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()

@@ -1,24 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { opprettSak, type SakFormData } from '@/lib/actions'
+import { opprettSak, oppdaterPartistemmer, type SakFormData, type SakMedStemmer } from '@/lib/actions'
 import { PARTIER } from '@/lib/types'
 import type { Stemme } from '@/lib/types'
 
 // Mapping fra Stortingets parti-IDer til våre kortnavn
 const PARTI_MAP: Record<string, string> = {
-  A: 'Ap',
-  H: 'H',
-  FrP: 'FrP',
-  SV: 'SV',
-  Sp: 'SP',
-  V: 'V',
-  KrF: 'KrF',
-  MDG: 'MDG',
-  R: 'R',
-  // Varianter
-  Ap: 'Ap',
-  SP: 'SP',
+  A: 'Ap', H: 'H', FrP: 'FrP', SV: 'SV', Sp: 'SP',
+  V: 'V', KrF: 'KrF', MDG: 'MDG', R: 'R',
+  Ap: 'Ap', SP: 'SP',
 }
 
 interface Votering {
@@ -31,6 +22,8 @@ interface Votering {
   antall_mot: number
   antall_ikke_tilstede: number
   votering_resultat_type: string
+  votering_resultat_tekst: string
+  kommentar: string | null
 }
 
 interface PartiResultat {
@@ -40,18 +33,25 @@ interface PartiResultat {
   antall_ikke_tilstede: number
 }
 
+// Hva brukeren velger per votering: knytt til delsak, opprett ny, eller ignorer
+type VoteringValg =
+  | { type: 'ignorer' }
+  | { type: 'ny_delsak' }
+  | { type: 'eksisterende'; delsakId: string }
+
 interface Props {
   sakId: string
-  stortingsSakId: string  // Sak-ID fra Stortinget (f.eks. "87318")
+  stortingsSakId: string
+  delsaker: SakMedStemmer[]
   onImportert: () => void
 }
 
-export default function VoteringImport({ sakId, stortingsSakId, onImportert }: Props) {
+export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImportert }: Props) {
   const [laster, setLaster] = useState(false)
   const [importerer, setImporterer] = useState(false)
   const [voteringer, setVoteringer] = useState<Votering[] | null>(null)
-  const [valgte, setValgte] = useState<Set<string>>(new Set())
   const [partiData, setPartiData] = useState<Record<string, PartiResultat[]>>({})
+  const [valg, setValg] = useState<Record<string, VoteringValg>>({})
   const [feil, setFeil] = useState('')
   const [importStatus, setImportStatus] = useState({ ferdig: 0, totalt: 0 })
 
@@ -63,16 +63,24 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Feil ved henting')
 
-      setVoteringer(data.voteringer ?? [])
+      const liste: Votering[] = data.voteringer ?? []
+      setVoteringer(liste)
 
-      // Hent partiresultater for alle voteringer parallelt
-      if (data.voteringer?.length > 0) {
-        const partiPromises = data.voteringer.map(async (v: Votering) => {
+      // Sett standard: alle er "ignorer"
+      const defaultValg: Record<string, VoteringValg> = {}
+      for (const v of liste) {
+        defaultValg[v.votering_id] = { type: 'ignorer' }
+      }
+      setValg(defaultValg)
+
+      // Hent partiresultater parallelt
+      if (liste.length > 0) {
+        const promises = liste.map(async (v) => {
           const partiRes = await fetch(`/api/stortinget?partiresultat=${encodeURIComponent(v.votering_id)}`)
-          const partiData = await partiRes.json()
-          return { voteringId: v.votering_id, partier: partiData.partier ?? [] }
+          const partiJson = await partiRes.json()
+          return { voteringId: v.votering_id, partier: partiJson.partier ?? [] }
         })
-        const resultater = await Promise.all(partiPromises)
+        const resultater = await Promise.all(promises)
         const map: Record<string, PartiResultat[]> = {}
         for (const r of resultater) {
           map[r.voteringId] = r.partier
@@ -86,25 +94,11 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
     }
   }
 
-  function toggleVotering(voteringId: string) {
-    setValgte(prev => {
-      const ny = new Set(prev)
-      if (ny.has(voteringId)) ny.delete(voteringId)
-      else ny.add(voteringId)
-      return ny
-    })
+  function oppdaterValg(voteringId: string, nyttValg: VoteringValg) {
+    setValg(prev => ({ ...prev, [voteringId]: nyttValg }))
   }
 
-  function velgAlle() {
-    if (!voteringer) return
-    if (valgte.size === voteringer.length) {
-      setValgte(new Set())
-    } else {
-      setValgte(new Set(voteringer.map(v => v.votering_id)))
-    }
-  }
-
-  function mapPartiStemme(partier: PartiResultat[]): { parti: string; stemme: Stemme }[] {
+  function mapPartiStemmer(partier: PartiResultat[]): { parti: string; stemme: Stemme }[] {
     return PARTIER.map(p => {
       const match = partier.find(pr => PARTI_MAP[pr.parti] === p)
       if (!match) return { parti: p, stemme: 'ukjent' as Stemme }
@@ -114,47 +108,61 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
     })
   }
 
-  async function importerValgte() {
-    if (valgte.size === 0 || !voteringer) return
+  // Tell antall aktive (ikke-ignorerte) valg
+  const aktiveValg = Object.values(valg).filter(v => v.type !== 'ignorer').length
+
+  async function importer() {
+    if (aktiveValg === 0 || !voteringer) return
     setImporterer(true)
     setFeil('')
-    setImportStatus({ ferdig: 0, totalt: valgte.size })
+    setImportStatus({ ferdig: 0, totalt: aktiveValg })
 
-    const valgteVoteringer = voteringer.filter(v => valgte.has(v.votering_id))
+    for (const votering of voteringer) {
+      const v = valg[votering.votering_id]
+      if (!v || v.type === 'ignorer') continue
 
-    for (const votering of valgteVoteringer) {
-      const stemmer = mapPartiStemme(partiData[votering.votering_id] ?? [])
+      const stemmer = mapPartiStemmer(partiData[votering.votering_id] ?? [])
 
-      const formData: SakFormData = {
-        tittel: votering.votering_tema || `Votering ${votering.votering_id}`,
-        beskrivelse: null,
-        niva: null,
-        landing: votering.vedtatt ? 'vedtatt' : 'ukjent',
-        komite_id: null,
-        stortingssak_ref: null,
-        sesjon: null,
-        komite_dato: null,
-        stortings_dato: votering.votering_tid,
-        forelder_id: sakId,
-        stemmer,
-      }
-
-      const result = await opprettSak(formData)
-      if (!result.success) {
-        setFeil(`Feil ved import av "${votering.votering_tema}": ${result.error}`)
-        setImporterer(false)
-        return
+      if (v.type === 'eksisterende') {
+        // Oppdater partistemmer på eksisterende delsak
+        const result = await oppdaterPartistemmer(v.delsakId, stemmer)
+        if (!result.success) {
+          setFeil(`Feil ved oppdatering: ${result.error}`)
+          setImporterer(false)
+          return
+        }
+      } else {
+        // Opprett ny delsak
+        const formData: SakFormData = {
+          tittel: votering.votering_tema || `Votering ${votering.votering_id}`,
+          beskrivelse: null,
+          niva: null,
+          landing: votering.vedtatt ? 'vedtatt' : 'ukjent',
+          komite_id: null,
+          stortingssak_ref: null,
+          sesjon: null,
+          komite_dato: null,
+          stortings_dato: votering.votering_tid,
+          forelder_id: sakId,
+          stemmer,
+        }
+        const result = await opprettSak(formData)
+        if (!result.success) {
+          setFeil(`Feil ved oppretting: ${result.error}`)
+          setImporterer(false)
+          return
+        }
       }
       setImportStatus(prev => ({ ...prev, ferdig: prev.ferdig + 1 }))
     }
 
     setImporterer(false)
     setVoteringer(null)
-    setValgte(new Set())
+    setValg({})
     onImportert()
   }
 
-  // Ikke vist ennå — vis knapp
+  // ── Ikke hentet ennå ──
   if (!voteringer) {
     return (
       <button
@@ -179,7 +187,7 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
     )
   }
 
-  // Ingen voteringer funnet
+  // ── Ingen voteringer ──
   if (voteringer.length === 0) {
     return (
       <div className="text-xs text-gray-400 flex items-center gap-2">
@@ -192,46 +200,47 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
     )
   }
 
-  // Vis voteringer med checkboxer
+  // ── Vis voteringer med matching ──
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-500">
-          {voteringer.length} votering{voteringer.length > 1 ? 'er' : ''} funnet — velg de som er relevante:
+          {voteringer.length} votering{voteringer.length > 1 ? 'er' : ''} funnet — velg handling for de relevante:
         </p>
-        <div className="flex items-center gap-2">
-          <button onClick={velgAlle} className="text-xs text-[#4A9EDB] hover:underline">
-            {valgte.size === voteringer.length ? 'Fjern alle' : 'Velg alle'}
-          </button>
-          <button onClick={() => setVoteringer(null)} className="text-xs text-gray-400 hover:text-gray-600">
-            Avbryt
-          </button>
-        </div>
+        <button onClick={() => setVoteringer(null)} className="text-xs text-gray-400 hover:text-gray-600">
+          Lukk
+        </button>
       </div>
 
-      <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+      <div className="space-y-2 max-h-[400px] overflow-y-auto">
         {voteringer.map(v => {
-          const erValgt = valgte.has(v.votering_id)
+          const valgForVotering = valg[v.votering_id] ?? { type: 'ignorer' }
           const partier = partiData[v.votering_id] ?? []
+          const erAktiv = valgForVotering.type !== 'ignorer'
 
           return (
-            <label
+            <div
               key={v.votering_id}
-              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                erValgt ? 'border-[#4A9EDB]/40 bg-[#4A9EDB]/5' : 'border-gray-100 hover:bg-gray-50'
+              className={`p-3 rounded-lg border transition-colors ${
+                erAktiv ? 'border-[#4A9EDB]/40 bg-[#4A9EDB]/5' : 'border-gray-100'
               }`}
             >
-              <input
-                type="checkbox"
-                checked={erValgt}
-                onChange={() => toggleVotering(v.votering_id)}
-                className="mt-0.5 rounded border-gray-300 text-[#4A9EDB] focus:ring-[#4A9EDB]"
-              />
-              <div className="flex-1 min-w-0">
+              {/* Innhold */}
+              <div className="mb-2">
                 <div className="text-sm font-medium text-[#0F1923] leading-snug">
                   {v.votering_tema || 'Uten tema'}
                 </div>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                {v.votering_resultat_tekst && (
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    {v.votering_resultat_tekst}
+                  </p>
+                )}
+                {v.kommentar && (
+                  <p className="text-xs text-gray-400 mt-0.5 italic">
+                    {v.kommentar}
+                  </p>
+                )}
+                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                   <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                     v.vedtatt ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                   }`}>
@@ -246,13 +255,13 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
                     </span>
                   )}
                 </div>
-                {/* Mini parti-indikatorer */}
+                {/* Parti-indikatorer */}
                 {partier.length > 0 && (
                   <div className="flex gap-1 mt-1.5">
                     {PARTIER.map(p => {
                       const match = partier.find(pr => PARTI_MAP[pr.parti] === p)
                       if (!match) return (
-                        <span key={p} className="inline-flex items-center gap-0.5 text-[10px] text-gray-300">
+                        <span key={p} className="inline-flex items-center text-[10px] text-gray-300 px-1 py-0.5">
                           {p}
                         </span>
                       )
@@ -260,7 +269,7 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
                       return (
                         <span
                           key={p}
-                          className={`inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded ${
+                          className={`inline-flex items-center text-[10px] px-1 py-0.5 rounded ${
                             stemme === 'for' ? 'bg-emerald-100 text-emerald-700' :
                             stemme === 'mot' ? 'bg-red-100 text-red-700' :
                             'bg-gray-100 text-gray-400'
@@ -274,7 +283,35 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
                   </div>
                 )}
               </div>
-            </label>
+
+              {/* Handlingsvalg */}
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                <select
+                  value={
+                    valgForVotering.type === 'ignorer' ? '__ignorer' :
+                    valgForVotering.type === 'ny_delsak' ? '__ny' :
+                    valgForVotering.delsakId
+                  }
+                  onChange={e => {
+                    const val = e.target.value
+                    if (val === '__ignorer') oppdaterValg(v.votering_id, { type: 'ignorer' })
+                    else if (val === '__ny') oppdaterValg(v.votering_id, { type: 'ny_delsak' })
+                    else oppdaterValg(v.votering_id, { type: 'eksisterende', delsakId: val })
+                  }}
+                  className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                >
+                  <option value="__ignorer">— Hopp over</option>
+                  {delsaker.length > 0 && (
+                    <optgroup label="Knytt til eksisterende delsak">
+                      {delsaker.map(d => (
+                        <option key={d.id} value={d.id}>{d.tittel}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <option value="__ny">+ Opprett som ny delsak</option>
+                </select>
+              </div>
+            </div>
           )
         })}
       </div>
@@ -293,14 +330,13 @@ export default function VoteringImport({ sakId, stortingsSakId, onImportert }: P
       )}
 
       <button
-        onClick={importerValgte}
-        disabled={valgte.size === 0 || importerer}
+        onClick={importer}
+        disabled={aktiveValg === 0 || importerer}
         className="w-full px-4 py-2 text-sm bg-[#4A9EDB] text-white rounded-lg hover:bg-[#3a8ecb] transition-colors disabled:opacity-50"
       >
-        {valgte.size > 0
-          ? `Importer ${valgte.size} votering${valgte.size > 1 ? 'er' : ''} som delsak${valgte.size > 1 ? 'er' : ''}`
-          : 'Velg voteringer å importere'
-        }
+        {aktiveValg > 0
+          ? `Importer ${aktiveValg} votering${aktiveValg > 1 ? 'er' : ''}`
+          : 'Velg handling for voteringer'}
       </button>
     </div>
   )

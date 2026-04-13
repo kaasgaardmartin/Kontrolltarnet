@@ -551,6 +551,7 @@ export default function SakDetaljSide() {
                   <VoteringImport
                     sakId={sakId}
                     stortingsSakId={extractStortingsSakId(sak.stortingssak_ref)!}
+                    delsaker={sak.delsaker ?? []}
                     onImportert={() => {
                       invaliderSak(sakId)
                       invaliderSaker()
