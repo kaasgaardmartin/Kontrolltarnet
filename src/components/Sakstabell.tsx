@@ -98,7 +98,7 @@ function SaksRad({
         erDelsak ? 'bg-gray-50/30' : ''
       }`}
     >
-      <td className={`py-3 ${erDelsak ? 'pl-10 pr-4' : 'px-4'}`}>
+      <td className={`py-3 px-4 ${erDelsak ? 'border-l-3 border-l-[#4A9EDB]/40' : ''}`}>
         <div className="flex items-center gap-2">
           {delsakToggle && (
             <button
@@ -114,14 +114,9 @@ function SaksRad({
               </svg>
             </button>
           )}
-          {erDelsak && (
-            <svg className="w-3 h-3 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15" />
-            </svg>
-          )}
           <div>
             <div className="flex items-center gap-1.5">
-              <span className={`font-medium text-[#0F1923] truncate max-w-[280px] ${erDelsak ? 'text-xs' : ''}`}>
+              <span className={`font-medium text-[#0F1923] truncate max-w-[280px] ${erDelsak ? 'text-[13px]' : ''}`}>
                 {sak.tittel}
               </span>
               {delsakToggle && !delsakToggle.utfoldet && (
