@@ -389,6 +389,7 @@ export async function oppdaterSak(sakId: string, formData: SakFormData): Promise
 }
 
 // Oppdaterer kun partistemmer på en eksisterende sak (brukes ved voteringsimport)
+// Hopper over stemmer med 'ukjent' for å ikke overskrive eksisterende data
 export async function oppdaterPartistemmer(
   sakId: string,
   stemmer: { parti: string; stemme: string }[]
@@ -398,7 +399,11 @@ export async function oppdaterPartistemmer(
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
-  for (const s of stemmer) {
+  // Kun upsert stemmer vi faktisk har data for (ikke ukjent)
+  const aktive = stemmer.filter(s => s.stemme !== 'ukjent')
+  if (aktive.length === 0) return { success: false, error: 'Ingen stemmedata funnet i voteringen' }
+
+  for (const s of aktive) {
     await supabase
       .from('partistemmer')
       .upsert(
