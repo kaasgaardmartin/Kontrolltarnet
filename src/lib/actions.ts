@@ -388,11 +388,12 @@ export async function oppdaterSak(sakId: string, formData: SakFormData): Promise
   return { success: true }
 }
 
-// Oppdaterer kun partistemmer på en eksisterende sak (brukes ved voteringsimport)
+// Oppdaterer partistemmer (og eventuelt landing) på en eksisterende sak
 // Hopper over stemmer med 'ukjent' for å ikke overskrive eksisterende data
 export async function oppdaterPartistemmer(
   sakId: string,
-  stemmer: { parti: string; stemme: string }[]
+  stemmer: { parti: string; stemme: string }[],
+  landing?: 'vedtatt' | 'faller' | null
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
@@ -416,6 +417,14 @@ export async function oppdaterPartistemmer(
         },
         { onConflict: 'sak_id,parti' }
       )
+  }
+
+  // Oppdater landing hvis angitt
+  if (landing) {
+    await supabase
+      .from('saker')
+      .update({ landing })
+      .eq('id', sakId)
   }
 
   return { success: true }

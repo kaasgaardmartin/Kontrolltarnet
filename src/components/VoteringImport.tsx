@@ -132,18 +132,19 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
       if (!v || v.type === 'ignorer') continue
 
       const stemmer = mapPartiStemmer(votering, partiData[votering.votering_id] ?? [])
+      const landing = votering.vedtatt ? 'vedtatt' as const : 'faller' as const
 
       if (v.type === 'hovedsak') {
-        // Oppdater partistemmer på hovedsaken
-        const result = await oppdaterPartistemmer(sakId, stemmer)
+        // Oppdater partistemmer og landing på hovedsaken
+        const result = await oppdaterPartistemmer(sakId, stemmer, landing)
         if (!result.success) {
           setFeil(`Feil ved oppdatering av hovedsak: ${result.error}`)
           setImporterer(false)
           return
         }
       } else if (v.type === 'eksisterende') {
-        // Oppdater partistemmer på eksisterende delsak
-        const result = await oppdaterPartistemmer(v.delsakId, stemmer)
+        // Oppdater partistemmer og landing på eksisterende delsak
+        const result = await oppdaterPartistemmer(v.delsakId, stemmer, landing)
         if (!result.success) {
           setFeil(`Feil ved oppdatering: ${result.error}`)
           setImporterer(false)
@@ -155,7 +156,7 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
           tittel: votering.votering_tema || `Votering ${votering.votering_id}`,
           beskrivelse: null,
           niva: null,
-          landing: votering.vedtatt ? 'vedtatt' : 'ukjent',
+          landing: votering.vedtatt ? 'vedtatt' : 'faller',
           komite_id: null,
           stortingssak_ref: null,
           sesjon: null,
