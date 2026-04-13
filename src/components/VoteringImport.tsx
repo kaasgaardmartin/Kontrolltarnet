@@ -33,10 +33,11 @@ interface PartiResultat {
   antall_ikke_tilstede: number
 }
 
-// Hva brukeren velger per votering: knytt til delsak, opprett ny, eller ignorer
+// Hva brukeren velger per votering
 type VoteringValg =
   | { type: 'ignorer' }
   | { type: 'ny_delsak' }
+  | { type: 'hovedsak' }
   | { type: 'eksisterende'; delsakId: string }
 
 interface Props {
@@ -123,7 +124,15 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
 
       const stemmer = mapPartiStemmer(partiData[votering.votering_id] ?? [])
 
-      if (v.type === 'eksisterende') {
+      if (v.type === 'hovedsak') {
+        // Oppdater partistemmer på hovedsaken
+        const result = await oppdaterPartistemmer(sakId, stemmer)
+        if (!result.success) {
+          setFeil(`Feil ved oppdatering av hovedsak: ${result.error}`)
+          setImporterer(false)
+          return
+        }
+      } else if (v.type === 'eksisterende') {
         // Oppdater partistemmer på eksisterende delsak
         const result = await oppdaterPartistemmer(v.delsakId, stemmer)
         if (!result.success) {
@@ -131,7 +140,7 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
           setImporterer(false)
           return
         }
-      } else {
+      } else if (v.type === 'ny_delsak') {
         // Opprett ny delsak
         const formData: SakFormData = {
           tittel: votering.votering_tema || `Votering ${votering.votering_id}`,
@@ -292,17 +301,20 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
                   value={
                     valgForVotering.type === 'ignorer' ? '__ignorer' :
                     valgForVotering.type === 'ny_delsak' ? '__ny' :
+                    valgForVotering.type === 'hovedsak' ? '__hovedsak' :
                     valgForVotering.delsakId
                   }
                   onChange={e => {
                     const val = e.target.value
                     if (val === '__ignorer') oppdaterValg(v.votering_id, { type: 'ignorer' })
                     else if (val === '__ny') oppdaterValg(v.votering_id, { type: 'ny_delsak' })
+                    else if (val === '__hovedsak') oppdaterValg(v.votering_id, { type: 'hovedsak' })
                     else oppdaterValg(v.votering_id, { type: 'eksisterende', delsakId: val })
                   }}
                   className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
                 >
                   <option value="__ignorer">— Hopp over</option>
+                  <option value="__hovedsak">Knytt til hovedsaken</option>
                   {delsaker.length > 0 && (
                     <optgroup label="Knytt til eksisterende delsak">
                       {delsaker.map(d => (
