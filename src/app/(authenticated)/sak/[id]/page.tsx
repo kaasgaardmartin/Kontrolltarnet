@@ -12,6 +12,7 @@ import StakeholderSeksjon from '@/components/StakeholderSeksjon'
 import AktivitetSeksjon from '@/components/AktivitetSeksjon'
 import TidslinjeSeksjon from '@/components/TidslinjeSeksjon'
 import SakModal from '@/components/SakModal'
+import VoteringImport from '@/components/VoteringImport'
 
 const STEMME_STIL: Record<Stemme, { bg: string; text: string; label: string }> = {
   for: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'For' },
@@ -40,6 +41,19 @@ function getDomainFromUrl(url: string): string {
   } catch {
     return url
   }
+}
+
+// Henter Stortingets sak-ID fra en stortingssak_ref URL (f.eks. "...?p=87318" → "87318")
+function extractStortingsSakId(ref: string | null): string | null {
+  if (!ref) return null
+  try {
+    const url = new URL(ref)
+    const p = url.searchParams.get('p')
+    if (p) return p
+  } catch { /* ikke en URL */ }
+  // Prøv som ren ID
+  if (/^\d+$/.test(ref)) return ref
+  return null
 }
 
 export default function SakDetaljSide() {
@@ -528,7 +542,21 @@ export default function SakDetaljSide() {
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-gray-400">Ingen delsaker ennå. Legg til delsaker for å spore enkeltvedtak.</p>
+                <p className="text-xs text-gray-400 mb-3">Ingen delsaker ennå. Legg til delsaker for å spore enkeltvedtak.</p>
+              )}
+
+              {/* Hent voteringer fra Stortinget */}
+              {sak.niva === 'storting' && extractStortingsSakId(sak.stortingssak_ref) && (
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <VoteringImport
+                    sakId={sakId}
+                    stortingsSakId={extractStortingsSakId(sak.stortingssak_ref)!}
+                    onImportert={() => {
+                      invaliderSak(sakId)
+                      invaliderSaker()
+                    }}
+                  />
+                </div>
               )}
             </div>
           )}

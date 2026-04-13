@@ -135,6 +135,102 @@ async function hentSakDetaljer(sakId: string): Promise<StortingetSak | null> {
   return parseSak(xml)
 }
 
+// ============================================================
+// Voteringsdata — henter voteringer og partiresultater
+// ============================================================
+
+export interface StortingetVotering {
+  votering_id: string
+  sak_id: string
+  vedtatt: boolean
+  votering_tema: string
+  votering_tid: string | null
+  antall_for: number
+  antall_mot: number
+  antall_ikke_tilstede: number
+  votering_resultat_type: string
+  partier?: StortingetPartiResultat[]
+}
+
+export interface StortingetPartiResultat {
+  parti: string
+  antall_for: number
+  antall_mot: number
+  antall_ikke_tilstede: number
+}
+
+function parseVotering(xml: string): StortingetVotering {
+  const votering_id = extractText(xml, 'votering_id') ?? ''
+  const sak_id = extractText(xml, 'sak_id') ?? ''
+  const vedtattStr = extractText(xml, 'vedtatt')
+  const vedtatt = vedtattStr === 'true'
+  const votering_tema = extractText(xml, 'votering_tema') ?? ''
+  const votering_tid_raw = extractText(xml, 'votering_tid')
+  const votering_tid = votering_tid_raw?.startsWith('01.01.0001') ? null : parseNorskDato(votering_tid_raw)
+  const antall_for = parseInt(extractText(xml, 'antall_for') ?? '0', 10)
+  const antall_mot = parseInt(extractText(xml, 'antall_mot') ?? '0', 10)
+  const antall_ikke_tilstede = parseInt(extractText(xml, 'antall_ikke_tilstede') ?? '0', 10)
+  const votering_resultat_type = extractText(xml, 'votering_resultat_type') ?? ''
+
+  return {
+    votering_id,
+    sak_id,
+    vedtatt,
+    votering_tema,
+    votering_tid,
+    antall_for,
+    antall_mot,
+    antall_ikke_tilstede,
+    votering_resultat_type,
+  }
+}
+
+async function hentVoteringer(sakId: string): Promise<StortingetVotering[]> {
+  const url = `https://data.stortinget.no/eksport/voteringer?sakid=${encodeURIComponent(sakId)}`
+  const response = await fetch(url)
+  if (!response.ok) return []
+  const xml = await response.text()
+
+  const blocks = xml.split(/<sak_votering>/).slice(1)
+  return blocks.map(block => parseVotering(block))
+}
+
+async function hentPartiResultat(voteringId: string): Promise<StortingetPartiResultat[]> {
+  const url = `https://data.stortinget.no/eksport/voteringsresultat?voteringid=${encodeURIComponent(voteringId)}`
+  const response = await fetch(url)
+  if (!response.ok) return []
+  const xml = await response.text()
+
+  // Aggreger stemmer per parti fra individuelle representant-resultater
+  const partiMap = new Map<string, { for: number; mot: number; ikke_tilstede: number }>()
+
+  const resultatBlocks = xml.split(/<representant_voteringsresultat>/).slice(1)
+  for (const block of resultatBlocks) {
+    // Hent parti-navn fra nested <parti> blokk
+    const partiBlock = block.match(/<parti>([\s\S]*?)<\/parti>/)
+    if (!partiBlock) continue
+    const partiId = extractText(partiBlock[1], 'id') ?? ''
+    if (!partiId) continue
+
+    const votering = extractText(block, 'votering') ?? ''
+
+    if (!partiMap.has(partiId)) {
+      partiMap.set(partiId, { for: 0, mot: 0, ikke_tilstede: 0 })
+    }
+    const p = partiMap.get(partiId)!
+    if (votering === 'for') p.for++
+    else if (votering === 'mot') p.mot++
+    else p.ikke_tilstede++
+  }
+
+  return Array.from(partiMap.entries()).map(([parti, tall]) => ({
+    parti,
+    antall_for: tall.for,
+    antall_mot: tall.mot,
+    antall_ikke_tilstede: tall.ikke_tilstede,
+  }))
+}
+
 export async function GET(request: NextRequest) {
   // Autentiseringskontroll — kun innloggede brukere
   const supabase = await createServerSupabaseClient()
@@ -148,8 +244,38 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const sakId = searchParams.get('sakid')
+  const voteringer = searchParams.get('voteringer') // sakid for å hente voteringer
+  const partiresultat = searchParams.get('partiresultat') // voteringid for partiresultat
   const sesjonId = searchParams.get('sesjon') || '2024-2025'
   const sok = searchParams.get('sok')?.toLowerCase()
+
+  // Hent partiresultat for én votering
+  if (partiresultat) {
+    try {
+      const resultater = await hentPartiResultat(partiresultat)
+      return NextResponse.json({ votering_id: partiresultat, partier: resultater })
+    } catch (error) {
+      console.error('Feil ved henting av partiresultat:', error)
+      return NextResponse.json(
+        { error: 'Kunne ikke hente partiresultat fra Stortinget' },
+        { status: 500 }
+      )
+    }
+  }
+
+  // Hent alle voteringer for en sak
+  if (voteringer) {
+    try {
+      const liste = await hentVoteringer(voteringer)
+      return NextResponse.json({ sak_id: voteringer, antall: liste.length, voteringer: liste })
+    } catch (error) {
+      console.error('Feil ved henting av voteringer:', error)
+      return NextResponse.json(
+        { error: 'Kunne ikke hente voteringer fra Stortinget' },
+        { status: 500 }
+      )
+    }
+  }
 
   // Hent én enkelt sak med fulle detaljer (inkl. datoer)
   if (sakId) {
