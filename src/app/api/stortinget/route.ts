@@ -149,8 +149,8 @@ export interface StortingetVotering {
   antall_mot: number
   antall_ikke_tilstede: number
   votering_resultat_type: string
-  votering_resultat_tekst: string
-  kommentar: string | null
+  forslag: string[]  // Forslagsbetegnelser (f.eks. "Forslag nr. 154 fra Rødt")
+  forslag_tekst_kort: string | null  // Kort tekstutdrag fra første forslag
   partier?: StortingetPartiResultat[]
 }
 
@@ -173,9 +173,6 @@ function parseVotering(xml: string): StortingetVotering {
   const antall_mot = parseInt(extractText(xml, 'antall_mot') ?? '0', 10)
   const antall_ikke_tilstede = parseInt(extractText(xml, 'antall_ikke_tilstede') ?? '0', 10)
   const votering_resultat_type = extractText(xml, 'votering_resultat_type') ?? ''
-  const votering_resultat_tekst = extractText(xml, 'votering_resultat_tekst') ?? ''
-  const kommentar = extractText(xml, 'kommentar')
-
   return {
     votering_id,
     sak_id,
@@ -186,9 +183,44 @@ function parseVotering(xml: string): StortingetVotering {
     antall_mot,
     antall_ikke_tilstede,
     votering_resultat_type,
-    votering_resultat_tekst,
-    kommentar,
+    forslag: [],
+    forslag_tekst_kort: null,
   }
+}
+
+// Strippper HTML-tags og returnerer ren tekst, begrenset til maxLen tegn
+function stripHtml(html: string, maxLen = 200): string {
+  // Decode HTML entities (&lt; → <, &gt; → >, etc.)
+  const decoded = html.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+  // Fjern alle HTML-tags
+  const text = decoded.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return text.length > maxLen ? text.slice(0, maxLen) + '...' : text
+}
+
+async function hentForslag(voteringId: string): Promise<{ betegnelser: string[]; kortTekst: string | null }> {
+  const url = `https://data.stortinget.no/eksport/voteringsforslag?voteringid=${encodeURIComponent(voteringId)}`
+  const response = await fetch(url)
+  if (!response.ok) return { betegnelser: [], kortTekst: null }
+  const xml = await response.text()
+
+  const forslagBlocks = xml.split(/<voteringsforslag>/).slice(1)
+  const betegnelser: string[] = []
+  let kortTekst: string | null = null
+
+  for (const block of forslagBlocks) {
+    const betegnelse = extractText(block, 'forslag_betegnelse')
+    if (betegnelse) betegnelser.push(betegnelse)
+
+    // Ta tekst fra første forslag som har innhold
+    if (!kortTekst) {
+      const tekst = extractText(block, 'forslag_tekst')
+      if (tekst && !tekst.includes('i:nil')) {
+        kortTekst = stripHtml(tekst)
+      }
+    }
+  }
+
+  return { betegnelser, kortTekst }
 }
 
 async function hentVoteringer(sakId: string): Promise<StortingetVotering[]> {
@@ -198,7 +230,17 @@ async function hentVoteringer(sakId: string): Promise<StortingetVotering[]> {
   const xml = await response.text()
 
   const blocks = xml.split(/<sak_votering>/).slice(1)
-  return blocks.map(block => parseVotering(block))
+  const voteringer = blocks.map(block => parseVotering(block))
+
+  // Berik med forslagsdata parallelt
+  const forslagPromises = voteringer.map(async (v) => {
+    const forslag = await hentForslag(v.votering_id)
+    v.forslag = forslag.betegnelser
+    v.forslag_tekst_kort = forslag.kortTekst
+    return v
+  })
+
+  return Promise.all(forslagPromises)
 }
 
 async function hentPartiResultat(voteringId: string): Promise<StortingetPartiResultat[]> {

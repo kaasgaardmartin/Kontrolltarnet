@@ -22,8 +22,8 @@ interface Votering {
   antall_mot: number
   antall_ikke_tilstede: number
   votering_resultat_type: string
-  votering_resultat_tekst: string
-  kommentar: string | null
+  forslag: string[]
+  forslag_tekst_kort: string | null
 }
 
 interface PartiResultat {
@@ -230,14 +230,16 @@ export default function VoteringImport({ sakId, stortingsSakId, delsaker, onImpo
                 <div className="text-sm font-medium text-[#0F1923] leading-snug">
                   {v.votering_tema || 'Uten tema'}
                 </div>
-                {v.votering_resultat_tekst && (
-                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    {v.votering_resultat_tekst}
-                  </p>
+                {v.forslag.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {v.forslag.map((f, i) => (
+                      <div key={i} className="text-xs text-gray-500">{f}</div>
+                    ))}
+                  </div>
                 )}
-                {v.kommentar && (
-                  <p className="text-xs text-gray-400 mt-0.5 italic">
-                    {v.kommentar}
+                {v.forslag_tekst_kort && (
+                  <p className="text-xs text-gray-400 mt-1 leading-relaxed italic">
+                    {v.forslag_tekst_kort}
                   </p>
                 )}
                 <div className="flex items-center gap-3 mt-1.5 flex-wrap">
