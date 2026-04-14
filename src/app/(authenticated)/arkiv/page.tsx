@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { PARTIER, type Stemme } from '@/lib/types'
 import { useState } from 'react'
 import { gjenopprettSak, slettSak, type SakMedStemmer } from '@/lib/actions'
-import { beregnFlertall, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
+import { beregnFlertall, type PartiStemme as FlertallPartiStemme, type Mandatfordeling } from '@/lib/flertall'
 import { useArkiverteSaker, useMandater, useInvaliderSakData } from '@/lib/queries'
 
 const STEMME_STIL: Record<Stemme, { bg: string; text: string; label: string }> = {
@@ -16,6 +16,99 @@ const STEMME_STIL: Record<Stemme, { bg: string; text: string; label: string }> =
 function getStemme(sak: SakMedStemmer, parti: string): Stemme {
   const found = sak.partistemmer.find(s => s.parti === parti)
   return (found?.stemme as Stemme) || 'ukjent'
+}
+
+function ArkivRadGroup({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
+}
+
+function ArkivRad({
+  sak,
+  mandater,
+  flertall,
+  erDelsak = false,
+  onGjenopprett,
+  onSlett,
+  bekreftSlett,
+  onBekreftSlett,
+  onAvbrytSlett,
+  router,
+}: {
+  sak: SakMedStemmer
+  mandater: Mandatfordeling[]
+  flertall: ReturnType<typeof beregnFlertall> | null
+  erDelsak?: boolean
+  onGjenopprett?: () => void
+  onSlett?: () => void
+  bekreftSlett?: boolean
+  onBekreftSlett?: () => void
+  onAvbrytSlett?: () => void
+  router: ReturnType<typeof useRouter>
+}) {
+  return (
+    <tr className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${erDelsak ? 'bg-gray-50/30' : ''}`}>
+      <td className={`py-3 ${erDelsak ? 'pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'px-4'}`}>
+        <button
+          onClick={() => router.push(`/sak/${sak.id}`)}
+          className={`text-[#0F1923] hover:text-[#4A9EDB] truncate max-w-[280px] text-left ${erDelsak ? 'text-[13px]' : 'font-medium'}`}
+        >
+          {sak.tittel}
+        </button>
+        {!erDelsak && sak.arkivert_dato && (
+          <div className="text-xs text-gray-400 mt-0.5">
+            Arkivert {new Date(sak.arkivert_dato).toLocaleDateString('nb-NO')}
+          </div>
+        )}
+      </td>
+      {PARTIER.map(parti => {
+        const stemme = getStemme(sak, parti)
+        const stil = STEMME_STIL[stemme]
+        return (
+          <td key={parti} className="px-1 py-3 text-center">
+            <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-xs font-medium ${stil.bg} ${stil.text}`}>
+              {stil.label}
+            </span>
+          </td>
+        )
+      })}
+      <td className="px-3 py-3 text-center">
+        {flertall ? (
+          <div className={`text-xs font-medium ${
+            flertall.harFlertall === 'for' ? 'text-emerald-600' :
+            flertall.harFlertall === 'mot' ? 'text-red-600' : 'text-gray-400'
+          }`}>
+            {flertall.forMandater}/{flertall.motMandater}
+          </div>
+        ) : '–'}
+      </td>
+      <td className="px-4 py-3 text-right">
+        {!erDelsak && (
+          <div className="flex items-center justify-end gap-3">
+            {onGjenopprett && (
+              <button onClick={onGjenopprett} className="text-xs text-[#4A9EDB] hover:underline">
+                Gjenopprett
+              </button>
+            )}
+            {bekreftSlett ? (
+              <span className="flex items-center gap-1.5">
+                <span className="text-xs text-red-600">Slette?</span>
+                <button onClick={onSlett} className="text-xs text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded transition-colors">
+                  Ja
+                </button>
+                <button onClick={onAvbrytSlett} className="text-xs text-gray-500 hover:text-gray-700">
+                  Nei
+                </button>
+              </span>
+            ) : (
+              <button onClick={onBekreftSlett} className="text-xs text-red-400 hover:text-red-600 hover:underline transition-colors">
+                Slett
+              </button>
+            )}
+          </div>
+        )}
+      </td>
+    </tr>
+  )
 }
 
 export default function ArkivPage() {
@@ -82,76 +175,36 @@ export default function ArkivPage() {
                   const flertall = mandater.length > 0 ? beregnFlertall(stemmerForBeregning, mandater) : null
 
                   return (
-                    <tr key={sak.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => router.push(`/sak/${sak.id}`)}
-                          className="font-medium text-[#0F1923] hover:text-[#4A9EDB] truncate max-w-[280px] text-left"
-                        >
-                          {sak.tittel}
-                        </button>
-                        {sak.arkivert_dato && (
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            Arkivert {new Date(sak.arkivert_dato).toLocaleDateString('nb-NO')}
-                          </div>
-                        )}
-                      </td>
-                      {PARTIER.map(parti => {
-                        const stemme = getStemme(sak, parti)
-                        const stil = STEMME_STIL[stemme]
+                    <ArkivRadGroup key={sak.id}>
+                      <ArkivRad
+                        sak={sak}
+                        mandater={mandater}
+                        flertall={flertall}
+                        onGjenopprett={() => handleGjenopprett(sak.id)}
+                        onSlett={() => handleSlett(sak.id)}
+                        bekreftSlett={bekreftSlettId === sak.id}
+                        onBekreftSlett={() => setBekreftSlettId(sak.id)}
+                        onAvbrytSlett={() => setBekreftSlettId(null)}
+                        router={router}
+                      />
+                      {sak.delsaker?.map(delsak => {
+                        const delStemmer: FlertallPartiStemme[] = PARTIER.map(p => ({
+                          parti: p,
+                          stemme: getStemme(delsak, p),
+                        }))
+                        const delFlertall = mandater.length > 0 ? beregnFlertall(delStemmer, mandater) : null
                         return (
-                          <td key={parti} className="px-1 py-3 text-center">
-                            <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-xs font-medium ${stil.bg} ${stil.text}`}>
-                              {stil.label}
-                            </span>
-                          </td>
+                          <ArkivRad
+                            key={delsak.id}
+                            sak={delsak}
+                            mandater={mandater}
+                            flertall={delFlertall}
+                            erDelsak
+                            router={router}
+                          />
                         )
                       })}
-                      <td className="px-3 py-3 text-center">
-                        {flertall ? (
-                          <div className={`text-xs font-medium ${
-                            flertall.harFlertall === 'for' ? 'text-emerald-600' :
-                            flertall.harFlertall === 'mot' ? 'text-red-600' : 'text-gray-400'
-                          }`}>
-                            {flertall.forMandater}/{flertall.motMandater}
-                          </div>
-                        ) : '–'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          <button
-                            onClick={() => handleGjenopprett(sak.id)}
-                            className="text-xs text-[#4A9EDB] hover:underline"
-                          >
-                            Gjenopprett
-                          </button>
-                          {bekreftSlettId === sak.id ? (
-                            <span className="flex items-center gap-1.5">
-                              <span className="text-xs text-red-600">Slette?</span>
-                              <button
-                                onClick={() => handleSlett(sak.id)}
-                                className="text-xs text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded transition-colors"
-                              >
-                                Ja
-                              </button>
-                              <button
-                                onClick={() => setBekreftSlettId(null)}
-                                className="text-xs text-gray-500 hover:text-gray-700"
-                              >
-                                Nei
-                              </button>
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => setBekreftSlettId(sak.id)}
-                              className="text-xs text-red-400 hover:text-red-600 hover:underline transition-colors"
-                            >
-                              Slett
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                    </ArkivRadGroup>
                   )
                 })}
               </tbody>

@@ -675,7 +675,17 @@ export async function hentArkiverteSaker(): Promise<SakMedStemmer[]> {
     .eq('arkivert', true)
     .order('arkivert_dato', { ascending: false })
 
-  return (data ?? []) as SakMedStemmer[]
+  const saker = (data ?? []) as SakMedStemmer[]
+
+  // Grupper delsaker under hovedsaker
+  const hovedsaker = saker.filter(s => !s.forelder_id)
+  const delsaker = saker.filter(s => s.forelder_id)
+
+  for (const hovedsak of hovedsaker) {
+    hovedsak.delsaker = delsaker.filter(d => d.forelder_id === hovedsak.id)
+  }
+
+  return hovedsaker
 }
 
 // ============================================================
