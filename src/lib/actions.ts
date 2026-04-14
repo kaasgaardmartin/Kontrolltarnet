@@ -598,12 +598,22 @@ export async function arkiverSak(sakId: string): Promise<{ success: boolean; err
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  const now = new Date().toISOString()
+
+  // Arkiver hovedsaken
   const { error } = await supabase
     .from('saker')
-    .update({ arkivert: true, arkivert_dato: new Date().toISOString() })
+    .update({ arkivert: true, arkivert_dato: now })
     .eq('id', sakId)
 
   if (error) return { success: false, error: error.message }
+
+  // Arkiver eventuelle delsaker
+  await supabase
+    .from('saker')
+    .update({ arkivert: true, arkivert_dato: now })
+    .eq('forelder_id', sakId)
+
   return { success: true }
 }
 
