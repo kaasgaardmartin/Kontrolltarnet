@@ -18,8 +18,9 @@ function getStemme(sak: SakMedStemmer, parti: string): Stemme {
   return (found?.stemme as Stemme) || 'ukjent'
 }
 
-function ArkivRadGroup({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+function ArkivRadGroup({ sak, children }: { sak: SakMedStemmer; children: (utfoldet: boolean, toggle: () => void) => React.ReactNode }) {
+  const [utfoldet, setUtfoldet] = useState(false)
+  return <>{children(utfoldet, () => setUtfoldet(prev => !prev))}</>
 }
 
 function ArkivRad({
@@ -27,6 +28,7 @@ function ArkivRad({
   mandater,
   flertall,
   erDelsak = false,
+  delsakToggle,
   onGjenopprett,
   onSlett,
   bekreftSlett,
@@ -38,6 +40,7 @@ function ArkivRad({
   mandater: Mandatfordeling[]
   flertall: ReturnType<typeof beregnFlertall> | null
   erDelsak?: boolean
+  delsakToggle?: { utfoldet: boolean; antall: number; onToggle: () => void }
   onGjenopprett?: () => void
   onSlett?: () => void
   bekreftSlett?: boolean
@@ -48,17 +51,41 @@ function ArkivRad({
   return (
     <tr className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${erDelsak ? 'bg-gray-50/30' : ''}`}>
       <td className={`py-3 ${erDelsak ? 'pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'px-4'}`}>
-        <button
-          onClick={() => router.push(`/sak/${sak.id}`)}
-          className={`text-[#0F1923] hover:text-[#4A9EDB] truncate max-w-[280px] text-left ${erDelsak ? 'text-[13px]' : 'font-medium'}`}
-        >
-          {sak.tittel}
-        </button>
-        {!erDelsak && sak.arkivert_dato && (
-          <div className="text-xs text-gray-400 mt-0.5">
-            Arkivert {new Date(sak.arkivert_dato).toLocaleDateString('nb-NO')}
+        <div className="flex items-center gap-2">
+          {delsakToggle ? (
+            <button
+              onClick={e => { e.stopPropagation(); delsakToggle.onToggle() }}
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
+            >
+              <svg
+                className={`w-3.5 h-3.5 transition-transform duration-150 ${delsakToggle.utfoldet ? 'rotate-90' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          ) : !erDelsak ? (
+            <span className="shrink-0 w-5" />
+          ) : null}
+          <div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => router.push(`/sak/${sak.id}`)}
+                className={`text-[#0F1923] hover:text-[#4A9EDB] truncate max-w-[280px] text-left ${erDelsak ? 'text-[13px]' : 'font-medium'}`}
+              >
+                {sak.tittel}
+              </button>
+              {delsakToggle && !delsakToggle.utfoldet && (
+                <span className="text-xs text-gray-400 shrink-0">({delsakToggle.antall})</span>
+              )}
+            </div>
+            {!erDelsak && sak.arkivert_dato && (
+              <div className="text-xs text-gray-400 mt-0.5">
+                Arkivert {new Date(sak.arkivert_dato).toLocaleDateString('nb-NO')}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </td>
       {PARTIER.map(parti => {
         const stemme = getStemme(sak, parti)
@@ -173,37 +200,47 @@ export default function ArkivPage() {
                     stemme: getStemme(sak, p),
                   }))
                   const flertall = mandater.length > 0 ? beregnFlertall(stemmerForBeregning, mandater) : null
+                  const harDelsaker = sak.delsaker && sak.delsaker.length > 0
 
                   return (
-                    <ArkivRadGroup key={sak.id}>
-                      <ArkivRad
-                        sak={sak}
-                        mandater={mandater}
-                        flertall={flertall}
-                        onGjenopprett={() => handleGjenopprett(sak.id)}
-                        onSlett={() => handleSlett(sak.id)}
-                        bekreftSlett={bekreftSlettId === sak.id}
-                        onBekreftSlett={() => setBekreftSlettId(sak.id)}
-                        onAvbrytSlett={() => setBekreftSlettId(null)}
-                        router={router}
-                      />
-                      {sak.delsaker?.map(delsak => {
-                        const delStemmer: FlertallPartiStemme[] = PARTIER.map(p => ({
-                          parti: p,
-                          stemme: getStemme(delsak, p),
-                        }))
-                        const delFlertall = mandater.length > 0 ? beregnFlertall(delStemmer, mandater) : null
-                        return (
+                    <ArkivRadGroup key={sak.id} sak={sak}>
+                      {(utfoldet, toggle) => (
+                        <>
                           <ArkivRad
-                            key={delsak.id}
-                            sak={delsak}
+                            sak={sak}
                             mandater={mandater}
-                            flertall={delFlertall}
-                            erDelsak
+                            flertall={flertall}
+                            delsakToggle={harDelsaker ? {
+                              utfoldet,
+                              antall: sak.delsaker!.length,
+                              onToggle: toggle,
+                            } : undefined}
+                            onGjenopprett={() => handleGjenopprett(sak.id)}
+                            onSlett={() => handleSlett(sak.id)}
+                            bekreftSlett={bekreftSlettId === sak.id}
+                            onBekreftSlett={() => setBekreftSlettId(sak.id)}
+                            onAvbrytSlett={() => setBekreftSlettId(null)}
                             router={router}
                           />
-                        )
-                      })}
+                          {harDelsaker && utfoldet && sak.delsaker!.map(delsak => {
+                            const delStemmer: FlertallPartiStemme[] = PARTIER.map(p => ({
+                              parti: p,
+                              stemme: getStemme(delsak, p),
+                            }))
+                            const delFlertall = mandater.length > 0 ? beregnFlertall(delStemmer, mandater) : null
+                            return (
+                              <ArkivRad
+                                key={delsak.id}
+                                sak={delsak}
+                                mandater={mandater}
+                                flertall={delFlertall}
+                                erDelsak
+                                router={router}
+                              />
+                            )
+                          })}
+                        </>
+                      )}
                     </ArkivRadGroup>
                   )
                 })}
