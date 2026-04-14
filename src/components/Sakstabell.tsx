@@ -98,7 +98,7 @@ function SaksRad({
         erDelsak ? 'bg-gray-50/30' : ''
       }`}
     >
-      <td className={`py-3 ${erDelsak ? 'pl-8 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'px-4'}`}>
+      <td className={`py-3 ${erDelsak ? 'pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'px-4'}`}>
         <div className="flex items-center gap-2">
           {delsakToggle ? (
             <button
