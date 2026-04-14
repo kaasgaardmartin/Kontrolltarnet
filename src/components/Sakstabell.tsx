@@ -118,7 +118,7 @@ function SaksRad({
           ) : null}
           <div>
             <div className="flex items-center gap-1.5">
-              <span className={`font-medium text-[#0F1923] truncate max-w-[280px] ${erDelsak ? 'text-[13px]' : ''}`}>
+              <span className={`text-[#0F1923] truncate max-w-[280px] ${erDelsak ? 'text-[13px]' : 'font-medium'}`}>
                 {sak.tittel}
               </span>
               {delsakToggle && !delsakToggle.utfoldet && (
