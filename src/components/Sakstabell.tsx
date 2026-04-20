@@ -94,11 +94,13 @@ function SaksRad({
   return (
     <tr
       onClick={() => onKlikk(sak)}
-      className={`border-b border-gray-100 hover:bg-gray-50/50 cursor-pointer transition-colors ${
-        erDelsak ? 'bg-gray-50/30' : ''
+      className={`cursor-pointer transition-colors ${
+        erDelsak
+          ? 'border-b border-gray-100 hover:bg-blue-50/30 bg-gray-50/40'
+          : 'border-b-2 border-gray-100 hover:bg-gray-50/60'
       }`}
     >
-      <td className={`py-3 ${erDelsak ? 'pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'px-4'}`}>
+      <td className={`${erDelsak ? 'py-2.5 pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'py-4 px-4'}`}>
         <div className="flex items-center gap-2">
           {delsakToggle ? (
             <button
@@ -148,12 +150,12 @@ function SaksRad({
           </div>
         </div>
       </td>
-      <td className="px-2 py-3">
+      <td className={`px-2 ${erDelsak ? 'py-2.5' : 'py-4'}`}>
         {sak.niva && (
           <span className="text-xs text-gray-500">{NIVA_LABEL[sak.niva] || sak.niva}</span>
         )}
       </td>
-      <td className="px-2 py-3">
+      <td className={`px-2 ${erDelsak ? 'py-2.5' : 'py-4'}`}>
         {sak.utfall ? (
           <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${
             sak.utfall === 'vedtatt'
@@ -169,7 +171,7 @@ function SaksRad({
         )}
       </td>
       {sak.niva !== 'storting' ? (
-        <td colSpan={erDelsak ? PARTIER.length + 1 : 1} className="px-3 py-3">
+        <td colSpan={erDelsak ? PARTIER.length + 1 : 1} className={`px-3 ${erDelsak ? 'py-2.5' : 'py-4'}`}>
           <div className="flex items-center gap-3 justify-center flex-wrap">
             {/* Neste frist */}
             {sak.aktivitet_oppsummering?.nesteFrist ? (() => {
@@ -218,14 +220,14 @@ function SaksRad({
             const stemme = getStemme(sak, parti)
             const stil = STEMME_STIL[stemme]
             return (
-              <td key={parti} className="px-1 py-3 text-center">
+              <td key={parti} className={`px-1 ${erDelsak ? 'py-2.5' : 'py-4'} text-center`}>
                 <span className={`inline-flex items-center justify-center ${erDelsak ? 'w-6 h-6' : 'w-7 h-7'} rounded text-xs font-medium ${stil.bg} ${stil.text}`}>
                   {stil.label}
                 </span>
               </td>
             )
           })}
-          <td className="px-3 py-3 text-center">
+          <td className={`px-3 ${erDelsak ? 'py-2.5' : 'py-4'} text-center`}>
             {flertall ? (
               <div className={`text-xs font-medium ${
                 flertall.harFlertall === 'for' ? 'text-emerald-600' :

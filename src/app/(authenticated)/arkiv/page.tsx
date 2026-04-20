@@ -49,8 +49,12 @@ function ArkivRad({
   router: ReturnType<typeof useRouter>
 }) {
   return (
-    <tr className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${erDelsak ? 'bg-gray-50/30' : ''}`}>
-      <td className={`py-3 ${erDelsak ? 'pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'px-4'}`}>
+    <tr className={`transition-colors cursor-pointer ${
+      erDelsak
+        ? 'border-b border-gray-100 hover:bg-blue-50/30 bg-gray-50/40'
+        : 'border-b-2 border-gray-100 hover:bg-gray-50/60'
+    }`}>
+      <td className={`${erDelsak ? 'py-2.5 pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'py-4 px-4'}`}>
         <div className="flex items-center gap-2">
           {delsakToggle ? (
             <button
@@ -91,14 +95,14 @@ function ArkivRad({
         const stemme = getStemme(sak, parti)
         const stil = STEMME_STIL[stemme]
         return (
-          <td key={parti} className="px-1 py-3 text-center">
-            <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-xs font-medium ${stil.bg} ${stil.text}`}>
+          <td key={parti} className={`px-1 ${erDelsak ? 'py-2.5' : 'py-4'} text-center`}>
+            <span className={`inline-flex items-center justify-center ${erDelsak ? 'w-6 h-6' : 'w-7 h-7'} rounded text-xs font-medium ${stil.bg} ${stil.text}`}>
               {stil.label}
             </span>
           </td>
         )
       })}
-      <td className="px-3 py-3 text-center">
+      <td className={`px-3 ${erDelsak ? 'py-2.5' : 'py-4'} text-center`}>
         {flertall ? (
           <div className={`text-xs font-medium ${
             flertall.harFlertall === 'for' ? 'text-emerald-600' :
@@ -108,7 +112,7 @@ function ArkivRad({
           </div>
         ) : '–'}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className={`px-4 ${erDelsak ? 'py-2.5' : 'py-4'} text-right`}>
         {!erDelsak && (
           <div className="flex items-center justify-end gap-3">
             {onGjenopprett && (
