@@ -96,11 +96,11 @@ function SaksRad({
       onClick={() => onKlikk(sak)}
       className={`cursor-pointer transition-colors ${
         erDelsak
-          ? 'border-b border-gray-100 hover:bg-blue-50/30 bg-gray-50/40'
-          : 'border-b-2 border-gray-100 hover:bg-gray-50/60'
+          ? 'border-b border-gray-100 hover:bg-blue-50/40 bg-[#F8FAFB]'
+          : 'hover:bg-gray-50'
       }`}
     >
-      <td className={`${erDelsak ? 'py-2.5 pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'py-4 px-4'}`}>
+      <td className={`${erDelsak ? 'py-2.5 pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/50' : 'py-4 px-4'}`}>
         <div className="flex items-center gap-2">
           {delsakToggle ? (
             <button
@@ -300,8 +300,15 @@ export default function Sakstabell({ saker, mandater, onKlikk }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {stortingssaker.map(sak => (
-                    <SaksRadMedDelsaker key={sak.id} sak={sak} mandater={mandater} onKlikk={onKlikk} />
+                  {stortingssaker.map((sak, i) => (
+                    <>
+                      {i > 0 && (
+                        <tr key={`sep-${sak.id}`} aria-hidden>
+                          <td colSpan={PARTIER.length + 4} className="h-2 bg-gray-100 p-0" />
+                        </tr>
+                      )}
+                      <SaksRadMedDelsaker key={sak.id} sak={sak} mandater={mandater} onKlikk={onKlikk} />
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -334,8 +341,15 @@ export default function Sakstabell({ saker, mandater, onKlikk }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {andreSaker.map(sak => (
-                    <SaksRadMedDelsaker key={sak.id} sak={sak} mandater={mandater} onKlikk={onKlikk} />
+                  {andreSaker.map((sak, i) => (
+                    <>
+                      {i > 0 && (
+                        <tr key={`sep-${sak.id}`} aria-hidden>
+                          <td colSpan={4} className="h-2 bg-gray-100 p-0" />
+                        </tr>
+                      )}
+                      <SaksRadMedDelsaker key={sak.id} sak={sak} mandater={mandater} onKlikk={onKlikk} />
+                    </>
                   ))}
                 </tbody>
               </table>

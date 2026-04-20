@@ -49,12 +49,12 @@ function ArkivRad({
   router: ReturnType<typeof useRouter>
 }) {
   return (
-    <tr className={`transition-colors cursor-pointer ${
+    <tr className={`transition-colors ${
       erDelsak
-        ? 'border-b border-gray-100 hover:bg-blue-50/30 bg-gray-50/40'
-        : 'border-b-2 border-gray-100 hover:bg-gray-50/60'
+        ? 'border-b border-gray-100 hover:bg-blue-50/40 bg-[#F8FAFB]'
+        : 'hover:bg-gray-50'
     }`}>
-      <td className={`${erDelsak ? 'py-2.5 pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/40' : 'py-4 px-4'}`}>
+      <td className={`${erDelsak ? 'py-2.5 pl-12 pr-4 border-l-3 border-l-[#4A9EDB]/50' : 'py-4 px-4'}`}>
         <div className="flex items-center gap-2">
           {delsakToggle ? (
             <button
@@ -198,7 +198,7 @@ export default function ArkivPage() {
                 </tr>
               </thead>
               <tbody>
-                {saker.map(sak => {
+                {saker.map((sak, i) => {
                   const stemmerForBeregning: FlertallPartiStemme[] = PARTIER.map(p => ({
                     parti: p,
                     stemme: getStemme(sak, p),
@@ -207,6 +207,12 @@ export default function ArkivPage() {
                   const harDelsaker = sak.delsaker && sak.delsaker.length > 0
 
                   return (
+                    <>
+                      {i > 0 && (
+                        <tr key={`sep-${sak.id}`} aria-hidden>
+                          <td colSpan={PARTIER.length + 4} className="h-2 bg-gray-100 p-0" />
+                        </tr>
+                      )}
                     <ArkivRadGroup key={sak.id} sak={sak}>
                       {(utfoldet, toggle) => (
                         <>
@@ -246,6 +252,7 @@ export default function ArkivPage() {
                         </>
                       )}
                     </ArkivRadGroup>
+                    </>
                   )
                 })}
               </tbody>
