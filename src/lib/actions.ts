@@ -84,11 +84,23 @@ export interface AktivitetOppsummering {
   nesteFrist: string | null
 }
 
+export interface HoringOppsummering {
+  /** Nærmeste kommende frist (innspillsfrist eller anmodningsfrist) */
+  nesteFrist: string | null
+  /** Type: 'innspill' = skriftlig høring, 'anmodning' = påmelding muntlig, 'start' = høringsdato */
+  fristType: 'innspill' | 'anmodning' | 'start' | null
+  /** Er høringen skriftlig (true) eller muntlig (false) */
+  skriftlig: boolean | null
+  /** Er det noen aktive høringer (Aktiv / Planlagt) */
+  harAktiveHoringer: boolean
+}
+
 export interface SakMedStemmer extends Sak {
   partistemmer: PartiStemme[]
   delsaker?: SakMedStemmer[]
   stakeholder_navn?: string[]
   aktivitet_oppsummering?: AktivitetOppsummering
+  horing_oppsummering?: HoringOppsummering
 }
 
 export interface SakFormData {
@@ -161,13 +173,15 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return []
 
-  // Fetch all non-archived saker with their votes, stakeholder names, and activities
+  // Fetch all non-archived saker with their votes, stakeholder names, activities, and hearings
   const { data: alleSaker } = await supabase
     .from('saker')
-    .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn)), aktiviteter(frist, status)')
+    .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn)), aktiviteter(frist, status), horinger(innspillsfrist, anmodningsfrist, start_dato, status, skriftlig)')
     .eq('organisasjon_id', bruker.organisasjon_id)
     .eq('arkivert', false)
     .order('updated_at', { ascending: false })
+
+  const nå = new Date()
 
   const saker = (alleSaker ?? []).map((s: Record<string, unknown>) => {
     const sakStakeholders = (s.sak_stakeholders ?? []) as { stakeholders: { navn: string } | null }[]
@@ -187,8 +201,48 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
       nesteFrist: frister.length > 0 ? frister[0] : null,
     }
 
-    const { sak_stakeholders: _ss, aktiviteter: _ak, ...rest } = s
-    return { ...rest, stakeholder_navn, aktivitet_oppsummering } as SakMedStemmer
+    // Beregn høring-oppsummering — finn nærmeste kommende frist
+    const horinger = (s.horinger ?? []) as {
+      innspillsfrist: string | null
+      anmodningsfrist: string | null
+      start_dato: string | null
+      status: string | null
+      skriftlig: boolean
+    }[]
+    const aktiveStatuser = ['Aktiv', 'Planlagt', 'aktiv', 'planlagt']
+    const aktiveHoringer = horinger.filter(h => !h.status || aktiveStatuser.includes(h.status))
+    const harAktiveHoringer = aktiveHoringer.length > 0
+
+    // Samle alle frister (fremtidige og passerte) med type og skriftlig-flagg
+    type FristEntry = { dato: string; type: 'innspill' | 'anmodning' | 'start'; skriftlig: boolean }
+    const fremmedigeFrister: FristEntry[] = []
+    const passerateFrister: FristEntry[] = []
+    for (const h of aktiveHoringer) {
+      const kandidater: { dato: string | null; type: 'innspill' | 'anmodning' | 'start' }[] = [
+        { dato: h.innspillsfrist, type: 'innspill' },
+        { dato: h.anmodningsfrist, type: 'anmodning' },
+        { dato: h.start_dato, type: 'start' },
+      ]
+      for (const { dato, type } of kandidater) {
+        if (!dato) continue
+        const entry: FristEntry = { dato, type, skriftlig: h.skriftlig ?? true }
+        if (new Date(dato) >= nå) fremmedigeFrister.push(entry)
+        else passerateFrister.push(entry)
+      }
+    }
+    // Foretrekk nærmeste fremtidige frist; fall back til nyligste passerte
+    fremmedigeFrister.sort((a, b) => a.dato.localeCompare(b.dato))
+    passerateFrister.sort((a, b) => b.dato.localeCompare(a.dato)) // nyligste først
+    const nesteFristEntry = fremmedigeFrister[0] ?? passerateFrister[0] ?? null
+    const horing_oppsummering: HoringOppsummering = {
+      nesteFrist: nesteFristEntry?.dato ?? null,
+      fristType: nesteFristEntry?.type ?? null,
+      skriftlig: nesteFristEntry?.skriftlig ?? null,
+      harAktiveHoringer,
+    }
+
+    const { sak_stakeholders: _ss, aktiviteter: _ak, horinger: _ho, ...rest } = s
+    return { ...rest, stakeholder_navn, aktivitet_oppsummering, horing_oppsummering } as SakMedStemmer
   })
 
   // Separate into hovedsaker (no parent) and delsaker (has parent)

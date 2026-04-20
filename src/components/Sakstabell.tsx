@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { PARTIER, type Stemme } from '@/lib/types'
 import { beregnFlertall, type Mandatfordeling, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
-import type { SakMedStemmer } from '@/lib/actions'
+import type { SakMedStemmer, HoringOppsummering } from '@/lib/actions'
 
 function beregnDagerTil(dato: string): number {
   const d = new Date(dato)
@@ -67,6 +67,57 @@ function getDomainFromUrl(url: string): string {
   }
 }
 
+const FRIST_TYPE_LABEL: Record<string, string> = {
+  innspill: 'Høringsfrist',
+  anmodning: 'Påmeldingsfrist',
+  start: 'Høring',
+}
+
+function HoringChip({ horing }: { horing: HoringOppsummering }) {
+  if (!horing.nesteFrist) return null
+  const dager = beregnDagerTil(horing.nesteFrist)
+  const dato = new Date(horing.nesteFrist).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })
+  const erPassert = dager < 0
+
+  const typeLabel = erPassert
+    ? (horing.fristType === 'start' ? 'Avholdt' : 'Frist passert')
+    : (horing.fristType ? FRIST_TYPE_LABEL[horing.fristType] : 'Høring')
+
+  const farge = erPassert
+    ? 'bg-gray-100 text-gray-400'
+    : dager <= 3
+    ? 'bg-red-50 text-red-600 border border-red-200'
+    : dager <= 7
+    ? 'bg-amber-50 text-amber-600 border border-amber-200'
+    : 'bg-blue-50 text-blue-600 border border-blue-200'
+
+  const kortTekst = erPassert
+    ? `${Math.abs(dager)}d siden`
+    : dager === 0 ? 'i dag'
+    : dager === 1 ? 'i morgen'
+    : `om ${dager}d`
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-medium ${farge}`}
+      title={horing.skriftlig === false ? 'Muntlig høring' : 'Skriftlig høring'}
+    >
+      {/* Skriftlig: dokument-ikon | Muntlig: mikrofon-ikon */}
+      {horing.skriftlig === false ? (
+        <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
+        </svg>
+      ) : (
+        <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+        </svg>
+      )}
+      <span className={erPassert ? 'line-through' : ''}>{typeLabel} {dato}</span>
+      <span className="opacity-60">({kortTekst})</span>
+    </span>
+  )
+}
+
 function SaksRad({
   sak,
   mandater,
@@ -127,24 +178,29 @@ function SaksRad({
                 <span className="text-xs text-gray-400 shrink-0">({delsakToggle.antall})</span>
               )}
             </div>
-            {sak.stortingssak_ref && (
-              <div className="text-xs mt-0.5">
-                {sak.stortingssak_ref.startsWith('http') ? (
-                  <a
-                    href={sak.stortingssak_ref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={e => e.stopPropagation()}
-                    className="text-[#4A9EDB] hover:underline inline-flex items-center gap-1"
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.28" />
-                    </svg>
-                    {getDomainFromUrl(sak.stortingssak_ref)}
-                  </a>
-                ) : (
-                  <span className="text-gray-400">{sak.stortingssak_ref}</span>
+            {(sak.stortingssak_ref || sak.horing_oppsummering?.nesteFrist) && (
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                {sak.stortingssak_ref && (
+                  <span className="text-xs">
+                    {sak.stortingssak_ref.startsWith('http') ? (
+                      <a
+                        href={sak.stortingssak_ref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="text-[#4A9EDB] hover:underline inline-flex items-center gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.28" />
+                        </svg>
+                        {getDomainFromUrl(sak.stortingssak_ref)}
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">{sak.stortingssak_ref}</span>
+                    )}
+                  </span>
                 )}
+                {sak.horing_oppsummering && <HoringChip horing={sak.horing_oppsummering} />}
               </div>
             )}
           </div>

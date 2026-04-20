@@ -300,7 +300,7 @@ function parseIsoDateTime(raw: string | null): string | null {
   return raw
 }
 
-async function hentHoringerForSak(stortingsSakId: string): Promise<StortingetHoring[]> {
+export async function hentHoringerForSak(stortingsSakId: string): Promise<StortingetHoring[]> {
   // Beregn sesjonene vi bør sjekke (inneværende + forrige)
   const nå = new Date()
   const år = nå.getFullYear()
