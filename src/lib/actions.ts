@@ -790,6 +790,77 @@ export async function oppdaterStortingsmandater(
 }
 
 // ============================================================
+// Høringer
+// ============================================================
+
+export interface Horing {
+  id: string
+  sak_id: string
+  horing_id: string
+  tittel: string | null
+  skriftlig: boolean
+  innspillsfrist: string | null
+  anmodningsfrist: string | null
+  start_dato: string | null
+  status: string | null
+  created_at: string
+}
+
+export async function hentHoringer(sakId: string): Promise<Horing[]> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const { data } = await supabase
+    .from('horinger')
+    .select('*')
+    .eq('sak_id', sakId)
+    .order('innspillsfrist', { ascending: true })
+
+  return (data ?? []) as Horing[]
+}
+
+export async function lagreHoringer(
+  sakId: string,
+  horinger: { horing_id: string; tittel: string; skriftlig: boolean; innspillsfrist: string | null; anmodningsfrist: string | null; start_dato: string | null; status: string }[]
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const rader = horinger.map(h => ({
+    sak_id: sakId,
+    organisasjon_id: bruker.organisasjon_id,
+    horing_id: h.horing_id,
+    tittel: h.tittel,
+    skriftlig: h.skriftlig,
+    innspillsfrist: h.innspillsfrist,
+    anmodningsfrist: h.anmodningsfrist,
+    start_dato: h.start_dato,
+    status: h.status,
+  }))
+
+  const { error } = await supabase
+    .from('horinger')
+    .upsert(rader, { onConflict: 'sak_id,horing_id' })
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function slettHoring(horingId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { error } = await supabase.from('horinger').delete().eq('id', horingId)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// ============================================================
 // Brukeradministrasjon
 // ============================================================
 

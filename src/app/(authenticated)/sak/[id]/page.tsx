@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { PARTIER, type Stemme } from '@/lib/types'
 import { arkiverSak, registrerUtfall, toggleSakAbonnement, endreSakNiva, type SakMedStemmer } from '@/lib/actions'
 import { beregnFlertall, harOmvendtFlertall, type PartiStemme as FlertallPartiStemme } from '@/lib/flertall'
-import { useSak, useMandater, useKomiteMandater, useKomiteer, useOrgBrukere, useSakAbonnement, useInvaliderSakData } from '@/lib/queries'
+import { useSak, useMandater, useKomiteMandater, useKomiteer, useOrgBrukere, useSakAbonnement, useInvaliderSakData, useHoringer } from '@/lib/queries'
 import NotatSeksjon from '@/components/NotatSeksjon'
 import LenkeSeksjon from '@/components/LenkeSeksjon'
 import StakeholderSeksjon from '@/components/StakeholderSeksjon'
@@ -13,6 +13,7 @@ import AktivitetSeksjon from '@/components/AktivitetSeksjon'
 import TidslinjeSeksjon from '@/components/TidslinjeSeksjon'
 import SakModal from '@/components/SakModal'
 import VoteringImport from '@/components/VoteringImport'
+import HoringSeksjon from '@/components/HoringSeksjon'
 
 const STEMME_STIL: Record<Stemme, { bg: string; text: string; label: string }> = {
   for: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'For' },
@@ -69,6 +70,7 @@ export default function SakDetaljSide() {
   const [bekreftFlyttTilStorting, setBekreftFlyttTilStorting] = useState(false)
 
   const { invaliderSak, invaliderSaker, invaliderVarsler } = useInvaliderSakData()
+  const stortingsSakId = extractStortingsSakId(sak?.stortingssak_ref ?? null)
 
   // React Query hooks — cached data deles med andre sider
   const { data: sak, isLoading: lasterSak } = useSak(sakId)
@@ -77,6 +79,7 @@ export default function SakDetaljSide() {
   const { data: orgBrukere = [] } = useOrgBrukere()
   const { data: komiteMandater = [] } = useKomiteMandater(sak?.komite_id)
   const { data: foelger = false } = useSakAbonnement(sakId)
+  const { data: horinger = [], refetch: refetchHoringer } = useHoringer(sakId)
 
   const lastData = () => invaliderSak(sakId)
 
@@ -587,8 +590,20 @@ export default function SakDetaljSide() {
           )}
         </div>
 
-        {/* Right sidebar: Noter + Lenker */}
+        {/* Right sidebar: Høringer + Lenker + Notater */}
         <div className="space-y-4">
+          {/* Høringer — kun for storting-saker med Stortinget-referanse */}
+          {sak.niva === 'storting' && stortingsSakId && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <HoringSeksjon
+                sakId={sakId}
+                stortingsSakId={stortingsSakId}
+                horinger={horinger}
+                onOppdatert={() => refetchHoringer()}
+              />
+            </div>
+          )}
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <LenkeSeksjon
               sakId={sakId}

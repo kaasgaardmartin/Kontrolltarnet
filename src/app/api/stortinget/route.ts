@@ -279,6 +279,80 @@ async function hentPartiResultat(voteringId: string): Promise<StortingetPartiRes
   }))
 }
 
+// ============================================================
+// Høringer — henter og parser høringer fra Stortingets API
+// ============================================================
+
+export interface StortingetHoring {
+  horing_id: string
+  tittel: string
+  skriftlig: boolean
+  innspillsfrist: string | null   // ISO datetime
+  anmodningsfrist: string | null  // ISO datetime, null for skriftlige
+  start_dato: string | null       // ISO datetime
+  status: string                  // Aktiv, Planlagt, Avholdt, Avlyst
+}
+
+function parseIsoDateTime(raw: string | null): string | null {
+  if (!raw) return null
+  // Ignorer placeholder-datoer (0001-01-01)
+  if (raw.startsWith('0001-01-01')) return null
+  return raw
+}
+
+async function hentHoringerForSak(stortingsSakId: string): Promise<StortingetHoring[]> {
+  // Beregn sesjonene vi bør sjekke (inneværende + forrige)
+  const nå = new Date()
+  const år = nå.getFullYear()
+  const sesjoner = nå.getMonth() >= 9
+    ? [`${år}-${år + 1}`]
+    : [`${år - 1}-${år}`, `${år - 2}-${år - 1}`]
+
+  const funnet: StortingetHoring[] = []
+
+  for (const sesjonId of sesjoner) {
+    const url = `https://data.stortinget.no/eksport/horinger?sesjonid=${encodeURIComponent(sesjonId)}`
+    const response = await fetch(url, { next: { revalidate: 1800 } })
+    if (!response.ok) continue
+    const xml = await response.text()
+
+    // Splitt på <horing>-blokker
+    const blocks = xml.split(/<horing>/).slice(1)
+    for (const block of blocks) {
+      // Sjekk om denne høringen gjelder vår sak
+      const sakInfoBlock = block.match(/<horing_sak_info_liste>([\s\S]*?)<\/horing_sak_info_liste>/)
+      if (!sakInfoBlock) continue
+      const sakIds = extractAll(sakInfoBlock[1], 'sak_id')
+      if (!sakIds.includes(stortingsSakId)) continue
+
+      // Hent tittel fra første sak
+      const sakTittler = extractAll(sakInfoBlock[1], 'sak_korttittel')
+      const tittel = sakTittler[0] || extractText(block, 'id') || ''
+
+      const horingId = extractText(block, 'id') ?? ''
+      const skriftligStr = extractText(block, 'skriftlig')
+      const skriftlig = skriftligStr !== 'false'
+      const statusRaw = extractText(block, 'horing_status') ?? ''
+      const innspillsfristRaw = extractText(block, 'innspillsfrist')
+      const anmodningsfristRaw = extractText(block, 'anmodningsfrist_dato_tid')
+      const startDatoRaw = extractText(block, 'start_dato')
+
+      funnet.push({
+        horing_id: horingId,
+        tittel,
+        skriftlig,
+        innspillsfrist: parseIsoDateTime(innspillsfristRaw),
+        anmodningsfrist: parseIsoDateTime(anmodningsfristRaw),
+        start_dato: parseIsoDateTime(startDatoRaw),
+        status: statusRaw,
+      })
+    }
+    if (funnet.length > 0) break // Fant i denne sesjonen, ikke sjekk forrige
+  }
+
+  return funnet
+}
+
 export async function GET(request: NextRequest) {
   // Autentiseringskontroll — kun innloggede brukere
   const supabase = await createServerSupabaseClient()
@@ -294,6 +368,7 @@ export async function GET(request: NextRequest) {
   const sakId = searchParams.get('sakid')
   const voteringer = searchParams.get('voteringer') // sakid for å hente voteringer
   const partiresultat = searchParams.get('partiresultat') // voteringid for partiresultat
+  const horingerForSak = searchParams.get('horinger_for_sak') // stortings sak-id
   // Beregn inneværende sesjon: okt–des = YYYY-(YYYY+1), jan–sep = (YYYY-1)-YYYY
   const nå = new Date()
   const år = nå.getFullYear()
@@ -310,6 +385,20 @@ export async function GET(request: NextRequest) {
       console.error('Feil ved henting av partiresultat:', error)
       return NextResponse.json(
         { error: 'Kunne ikke hente partiresultat fra Stortinget' },
+        { status: 500 }
+      )
+    }
+  }
+
+  // Hent høringer for en spesifikk sak
+  if (horingerForSak) {
+    try {
+      const liste = await hentHoringerForSak(horingerForSak)
+      return NextResponse.json({ sak_id: horingerForSak, antall: liste.length, horinger: liste })
+    } catch (error) {
+      console.error('Feil ved henting av høringer:', error)
+      return NextResponse.json(
+        { error: 'Kunne ikke hente høringer fra Stortinget' },
         { status: 500 }
       )
     }

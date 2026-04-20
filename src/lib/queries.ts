@@ -14,6 +14,7 @@ import {
   hentMineAktiviteter,
   hentKomiteerMedMandater,
   hentAntallUlesteVarsler,
+  hentHoringer,
 } from './actions'
 
 // ============================================================
@@ -33,6 +34,7 @@ export const queryKeys = {
   sak: (id: string) => ['sak', id] as const,
   komiteMandater: (komiteId: string) => ['komiteMandater', komiteId] as const,
   sakAbonnement: (sakId: string) => ['sakAbonnement', sakId] as const,
+  horinger: (sakId: string) => ['horinger', sakId] as const,
 }
 
 // ============================================================
@@ -78,6 +80,14 @@ export function useSak(sakId: string) {
   return useQuery({
     queryKey: queryKeys.sak(sakId),
     queryFn: () => hentSak(sakId),
+  })
+}
+
+/** Høringer for en sak */
+export function useHoringer(sakId: string) {
+  return useQuery({
+    queryKey: queryKeys.horinger(sakId),
+    queryFn: () => hentHoringer(sakId),
   })
 }
 
