@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { hentHoringer, lagreHoringer, slettHoring, type Horing } from '@/lib/actions'
 import type { StortingetHoring } from '@/app/api/stortinget/route'
 
@@ -43,6 +43,39 @@ export default function HoringSeksjon({ sakId, stortingsSakId, horinger: initial
   const [lagrer, setLagrer] = useState(false)
   const [feil, setFeil] = useState('')
   const [ingenFunnet, setIngenFunnet] = useState(false)
+
+  // Auto-hent og lagre høringer ved første innlasting hvis ingen er lagret ennå
+  useEffect(() => {
+    if (initialHoringer.length === 0) {
+      autoHentOgImporter()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sakId, stortingsSakId])
+
+  async function autoHentOgImporter() {
+    setHenter(true)
+    try {
+      const res = await fetch(`/api/stortinget?horinger_for_sak=${encodeURIComponent(stortingsSakId)}`)
+      const data = await res.json()
+      if (!res.ok) return
+      const liste: StortingetHoring[] = data.horinger ?? []
+      if (liste.length === 0) {
+        setIngenFunnet(true)
+        return
+      }
+      // Importer automatisk uten å vise bekreftelsessteget
+      const result = await lagreHoringer(sakId, liste)
+      if (result.success) {
+        const oppdaterte = await hentHoringer(sakId)
+        setHoringer(oppdaterte)
+        onOppdatert()
+      }
+    } catch {
+      // Still feil — bruker kan prøve manuelt
+    } finally {
+      setHenter(false)
+    }
+  }
 
   async function hentFraStortinget() {
     setHenter(true)
@@ -104,20 +137,15 @@ export default function HoringSeksjon({ sakId, stortingsSakId, horinger: initial
           <button
             onClick={hentFraStortinget}
             disabled={henter}
-            className="flex items-center gap-1.5 text-xs text-[#4A9EDB] hover:text-[#3a8ecb] transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#4A9EDB] transition-colors disabled:opacity-50"
+            title={horinger.length > 0 ? 'Sjekk for nye høringer' : 'Hent fra Stortinget'}
           >
             {henter ? (
-              <>
-                <div className="animate-spin w-3 h-3 border-2 border-gray-200 border-t-[#4A9EDB] rounded-full" />
-                Henter...
-              </>
+              <div className="animate-spin w-3 h-3 border-2 border-gray-200 border-t-[#4A9EDB] rounded-full" />
             ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                </svg>
-                Hent fra Stortinget
-              </>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
             )}
           </button>
         )}
@@ -196,11 +224,17 @@ export default function HoringSeksjon({ sakId, stortingsSakId, horinger: initial
         </div>
       )}
 
-      {/* Ingen høringer lagret, ingen funnet */}
-      {horinger.length === 0 && !funnet && !ingenFunnet && (
-        <p className="text-xs text-gray-400 mb-2">
-          Ingen høringer registrert. Hent fra Stortinget for å sjekke om det finnes høringsdatoer.
+      {/* Laster automatisk */}
+      {horinger.length === 0 && henter && (
+        <p className="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 border-2 border-gray-200 border-t-[#4A9EDB] rounded-full animate-spin" />
+          Sjekker Stortinget for høringer...
         </p>
+      )}
+
+      {/* Ingen høringer funnet (etter auto-henting) */}
+      {horinger.length === 0 && !henter && !funnet && !ingenFunnet && (
+        <p className="text-xs text-gray-400 mb-2">Ingen høringer funnet for denne saken.</p>
       )}
 
       {/* Ingen funnet i API */}
