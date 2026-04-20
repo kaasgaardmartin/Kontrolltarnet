@@ -70,7 +70,6 @@ export default function SakDetaljSide() {
   const [bekreftFlyttTilStorting, setBekreftFlyttTilStorting] = useState(false)
 
   const { invaliderSak, invaliderSaker, invaliderVarsler } = useInvaliderSakData()
-  const stortingsSakId = extractStortingsSakId(sak?.stortingssak_ref ?? null)
 
   // React Query hooks — cached data deles med andre sider
   const { data: sak, isLoading: lasterSak } = useSak(sakId)
@@ -80,6 +79,8 @@ export default function SakDetaljSide() {
   const { data: komiteMandater = [] } = useKomiteMandater(sak?.komite_id)
   const { data: foelger = false } = useSakAbonnement(sakId)
   const { data: horinger = [], refetch: refetchHoringer } = useHoringer(sakId)
+
+  const stortingsSakId = extractStortingsSakId(sak?.stortingssak_ref ?? null)
 
   const lastData = () => invaliderSak(sakId)
 
