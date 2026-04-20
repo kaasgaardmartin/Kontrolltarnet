@@ -294,7 +294,11 @@ export async function GET(request: NextRequest) {
   const sakId = searchParams.get('sakid')
   const voteringer = searchParams.get('voteringer') // sakid for å hente voteringer
   const partiresultat = searchParams.get('partiresultat') // voteringid for partiresultat
-  const sesjonId = searchParams.get('sesjon') || '2024-2025'
+  // Beregn inneværende sesjon: okt–des = YYYY-(YYYY+1), jan–sep = (YYYY-1)-YYYY
+  const nå = new Date()
+  const år = nå.getFullYear()
+  const defaultSesjon = nå.getMonth() >= 9 ? `${år}-${år + 1}` : `${år - 1}-${år}`
+  const sesjonId = searchParams.get('sesjon') || defaultSesjon
   const sok = searchParams.get('sok')?.toLowerCase()
 
   // Hent partiresultat for én votering

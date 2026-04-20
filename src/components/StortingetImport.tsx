@@ -8,12 +8,21 @@ interface Props {
   onLukk: () => void
 }
 
+// Beregn inneværende sesjon basert på dato.
+// Stortingssesjonen starter i oktober: okt–des = YYYY-(YYYY+1), jan–sep = (YYYY-1)-YYYY
+function inneværendeSesjon(): string {
+  const nå = new Date()
+  const år = nå.getFullYear()
+  const måned = nå.getMonth() + 1 // 1-12
+  if (måned >= 10) return `${år}-${år + 1}`
+  return `${år - 1}-${år}`
+}
+
+const GJELDENDE_SESJON = inneværendeSesjon()
+
 const SESJONER = [
-  '2025-2026',
-  '2024-2025',
-  '2023-2024',
-  '2022-2023',
-  '2021-2022',
+  GJELDENDE_SESJON,
+  ...['2025-2026', '2024-2025', '2023-2024', '2022-2023', '2021-2022'].filter(s => s !== GJELDENDE_SESJON),
 ]
 
 const STATUS_FARGE: Record<string, string> = {
@@ -34,7 +43,7 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 export default function StortingetImport({ onImporter, onLukk }: Props) {
-  const [sesjon, setSesjon] = useState('2024-2025')
+  const [sesjon, setSesjon] = useState(GJELDENDE_SESJON)
   const [sok, setSok] = useState('')
   const [sokInput, setSokInput] = useState('')
   const [saker, setSaker] = useState<StortingetSak[]>([])
