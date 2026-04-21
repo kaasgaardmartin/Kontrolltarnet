@@ -29,11 +29,12 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users to login (except for login page and auth callback)
+  // Redirect unauthenticated users to login (except for login page, auth callback, and cron jobs)
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
+    !request.nextUrl.pathname.startsWith('/auth') &&
+    !request.nextUrl.pathname.startsWith('/api/cron/')
   ) {
     // Tillat uautentisert tilgang til Stortinget API — FJERNET.
     // API-ruter krever nå også autentisering.
