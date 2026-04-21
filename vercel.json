@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/oppdater-horinger",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/hent-offentlige-horinger",
+      "schedule": "0 8 * * *"
     }
   ]
 }
