@@ -118,8 +118,8 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
 
   // Fallback: søk i rå tekst
   if (!horingsfrist) {
-    // Format 1: "Høringsfrist: DD.MM.YYYY"
-    const f1 = html.match(/[Hh]øringsfrist[:\s]+(\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i)
+    // Format 1: "Høringsfrist: DD.MM.YYYY" — tillater HTML-tagger mellom label og dato (f.eks. <strong>Høringsfrist:</strong> 22.06.2026)
+    const f1 = html.match(/[Hh]øringsfrist(?:[:\s]|<[^>]+>)+(\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i)
     if (f1) horingsfrist = parseNorskDato(f1[1])
   }
   if (!horingsfrist) {
