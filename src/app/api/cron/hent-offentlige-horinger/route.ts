@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import { skrapRegjeringenSide } from '@/lib/horing-scrape'
 
 const LISTE_URL = 'https://www.regjeringen.no/no/dokument/hoyringar/id1763/'
 
@@ -40,7 +41,6 @@ async function hentHoringerFraListe(): Promise<HoringListeItem[]> {
   const resultater: HoringListeItem[] = []
 
   // Finn alle lenker til dokumenter-sider (høringer har URL /no/dokumenter/horing-...)
-  // Strategien: finn alle href som matcher høring-URL-mønsteret, og plukk kontekst rundt dem
   const lenkeMønster = /href="(\/no\/dokumenter\/[^"]+\/id\d+\/[^"]*)"/gi
   let lenkeMatch: RegExpExecArray | null
 
@@ -61,18 +61,18 @@ async function hentHoringerFraListe(): Promise<HoringListeItem[]> {
     const tittel = rensk(titelMatch[1])
     if (!tittel || tittel.length < 5) continue
 
-    // Høringsfrist: "Høringsfrist: DD.MM.YYYY" eller "Frist: DD.MM.YYYY"
+    // Høringsfrist
     const fristMatch = kontekst.match(/[Hh]øringsfrist[^:]*:\s*(\d{1,2}\.\d{1,2}\.\d{4})/i)
       ?? kontekst.match(/[Ff]rist[^:]*:\s*(\d{1,2}\.\d{1,2}\.\d{4})/i)
     const horingsfrist = fristMatch ? parseNorskDato(fristMatch[1]) : null
 
-    // Publiseringsdato: finn datoer i konteksten, ta den første som ikke er fristen
+    // Publiseringsdato
     const alleDatoer = [...kontekst.matchAll(/(\d{1,2}\.\d{1,2}\.\d{4})/g)]
       .map(m => m[1])
       .filter(d => d !== fristMatch?.[1])
     const publisert_dato = alleDatoer.length > 0 ? parseNorskDato(alleDatoer[0]) : null
 
-    // Departement: finn tekst etter "departement" eller "direktorat" i konteksten
+    // Departement
     const deptMatch = kontekst.match(/([A-ZÆØÅ][a-zæøåA-ZÆØÅ\s-]+(?:departementet|direktoratet|tilsynet|rådet|departement|Statsministerens kontor))/u)
     const departement = deptMatch ? deptMatch[1].replace(/\s+/g, ' ').trim() : null
 
@@ -86,6 +86,29 @@ async function hentHoringerFraListe(): Promise<HoringListeItem[]> {
   }
 
   return resultater
+}
+
+// Henter detaljer for en enkelt høring — returnerer null ved feil (for å ikke stoppe hele jobben)
+async function hentDetaljer(url: string) {
+  try {
+    return await skrapRegjeringenSide(url)
+  } catch {
+    return null
+  }
+}
+
+// Kjører promises i parallell med maks N samtidige
+async function pLimit<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
+  const results: T[] = []
+  let i = 0
+  async function worker() {
+    while (i < tasks.length) {
+      const idx = i++
+      results[idx] = await tasks[idx]()
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker))
+  return results
 }
 
 // ---- Cron-endepunkt ----
@@ -114,9 +137,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ melding: 'Ingen organisasjoner funnet', antall_nye: 0 })
     }
 
-    // Hent høringer fra regjeringen.no
-    const horinger = await hentHoringerFraListe()
-    if (!horinger.length) {
+    // Hent høringslisten fra regjeringen.no
+    const listeHoringer = await hentHoringerFraListe()
+    if (!listeHoringer.length) {
       return NextResponse.json({ melding: 'Ingen høringer funnet på listesiden', antall_nye: 0 })
     }
 
@@ -134,20 +157,30 @@ export async function GET(request: NextRequest) {
         (eksisterende ?? []).map(h => h.regjeringen_url as string)
       )
 
-      const nye = horinger.filter(h => !eksisterendeUrls.has(h.regjeringen_url))
+      const nye = listeHoringer.filter(h => !eksisterendeUrls.has(h.regjeringen_url))
       if (!nye.length) continue
 
-      const rader = nye.map(h => ({
-        organisasjon_id: org.id,
-        tittel: h.tittel,
-        departement: h.departement,
-        regjeringen_url: h.regjeringen_url,
-        publisert_dato: h.publisert_dato,
-        horingsfrist: h.horingsfrist,
-        status: 'innkommet' as const,
-        utvalg: [] as string[],
-        horing_instanser: [] as string[],
-      }))
+      // Hent detaljsider for alle nye høringer (maks 3 parallelle for å ikke overbelaste regjeringen.no)
+      const detaljTasks = nye.map(h => () => hentDetaljer(h.regjeringen_url))
+      const detaljer = await pLimit(detaljTasks, 3)
+
+      const rader = nye.map((h, idx) => {
+        const d = detaljer[idx]
+        return {
+          organisasjon_id: org.id,
+          tittel: d?.tittel ?? h.tittel,
+          departement: d?.departement ?? h.departement,
+          regjeringen_url: h.regjeringen_url,
+          publisert_dato: d?.publisert_dato ?? h.publisert_dato,
+          horingsfrist: d?.horingsfrist ?? h.horingsfrist,
+          referanse: d?.referanse ?? null,
+          horing_type: d?.horing_type ?? null,
+          beskrivelse: d?.beskrivelse ?? null,
+          horing_instanser: d?.horing_instanser ?? [],
+          status: 'innkommet' as const,
+          utvalg: [] as string[],
+        }
+      })
 
       const { error: insertFeil } = await supabase
         .from('offentlige_horinger')
@@ -162,7 +195,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       melding: 'Høringer oppdatert',
-      antall_funnet_pa_siden: horinger.length,
+      antall_funnet_pa_siden: listeHoringer.length,
       antall_nye_totalt: totaltNye,
     })
   } catch (err) {

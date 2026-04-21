@@ -195,9 +195,25 @@ export default function HoringerSide() {
                   >
                     <td className="px-4 py-3">
                       <div className="font-medium text-[#0F1923] leading-snug">{h.tittel}</div>
-                      {h.departement && (
-                        <div className="text-xs text-gray-400 mt-0.5 md:hidden">{h.departement}</div>
-                      )}
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {h.departement && (
+                          <span className="text-xs text-gray-400 md:hidden">{h.departement}</span>
+                        )}
+                        {h.regjeringen_url && (
+                          <a
+                            href={h.regjeringen_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="text-xs text-[#4A9EDB] hover:underline inline-flex items-center gap-1"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.28" />
+                            </svg>
+                            regjeringen.no
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600 hidden md:table-cell">
                       {h.departement || <span className="text-gray-300">—</span>}
