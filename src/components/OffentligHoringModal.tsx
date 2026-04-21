@@ -3,8 +3,13 @@
 import { useState, useEffect } from 'react'
 import type { OffentligHoring, OffentligHoringStatus, HoringType } from '@/lib/actions'
 import { opprettOffentligHoring, oppdaterOffentligHoring, slettOffentligHoring } from '@/lib/actions'
-import type { Bruker } from '@/lib/types'
 import type { HoringScrapeResultat } from '@/app/api/horing-scrape/route'
+
+interface BrukerMinimal {
+  id: string
+  navn: string
+  aktiv?: boolean
+}
 
 // ---- Konstanter ----
 
@@ -54,7 +59,7 @@ const STATUS_STEG: OffentligHoringStatus[] = ['innkommet', 'til_vurdering', 'sva
 
 interface Props {
   horing: OffentligHoring | null   // null = ny høring
-  brukere: Bruker[]
+  brukere: BrukerMinimal[]
   onLagret: () => void
   onLukk: () => void
 }
@@ -468,7 +473,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
                   >
                     <option value="">Ikke tildelt</option>
-                    {brukere.filter(b => b.aktiv).map(b => (
+                    {brukere.filter(b => b.aktiv !== false).map(b => (
                       <option key={b.id} value={b.id}>{b.navn}</option>
                     ))}
                   </select>
