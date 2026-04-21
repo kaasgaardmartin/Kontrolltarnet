@@ -118,8 +118,11 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
   }
 
   // ---- Saksnummer/referanse ----
-  const refMatch = html.match(/(?:Saksnr\.?|Referanse|Id)[:\s]*(\d{2}\/\d+)/i)
-  const referanse = refMatch ? refMatch[1] : null
+  // Prøv "Vår ref.:" først (høringsbrev-format), deretter generisk
+  const varRefMatch = html.match(/[Vv]år\s+ref\.?[:\s]+([^\s<\n]+(?:\s+[^\s<\n]+)?)/i)
+  const refMatch = varRefMatch
+    ?? html.match(/(?:Saksnr\.?|Referanse)[:\s]*(\d{2,4}\/\d+)/i)
+  const referanse = refMatch ? renskTekst(refMatch[1].replace(/<[^>]+>/g, '')) : null
 
   // ---- Høring type (skriftlig/muntlig) ----
   let horing_type: 'skriftlig' | 'muntlig' | 'begge' | null = null
@@ -132,18 +135,36 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     horing_type = 'muntlig'
   }
 
-  // ---- Beskrivelse ----
-  const bodyMatch = html.match(/<div[^>]*class="[^"]*article-body[^"]*"[^>]*>([\s\S]*?)<\/div>/)
+  // ---- Beskrivelse: hent hele høringsbrev-teksten ----
+  // regjeringen.no legger brødteksten i <article> eller div.article-body.
+  // Vi samler alle <p>-tagger og kutter ved høringsinstans-seksjonen.
   let beskrivelse: string | null = null
-  if (bodyMatch) {
-    const firstPara = bodyMatch[1].match(/<p[^>]*>([\s\S]*?)<\/p>/)
-    if (firstPara) {
-      beskrivelse = renskTekst(firstPara[1].replace(/<[^>]+>/g, ''))
-    }
+
+  // Prøv å finne article-body eller article-element
+  const articleBodyMatch =
+    html.match(/<div[^>]*class="[^"]*article-body[^"]*"[^>]*>([\s\S]*?)(?:<\/article>|<section[^>]*class="[^"]*hearing-instances[^"]*"|<h2[^>]*>[^<]*[Hh]øringsinstans)/i)
+    ?? html.match(/<article[^>]*>([\s\S]*?)(?:<section[^>]*class="[^"]*hearing-instances[^"]*"|<h2[^>]*>[^<]*[Hh]øringsinstans)/i)
+    ?? html.match(/<div[^>]*class="[^"]*article-body[^"]*"[^>]*>([\s\S]*)/i)
+
+  if (articleBodyMatch) {
+    const bodyHtml = articleBodyMatch[1]
+    // Hent alle <p>-tagger
+    const paraMatches = [...bodyHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    const avsnitt = paraMatches
+      .map(m => renskTekst(m[1].replace(/<[^>]+>/g, '')))
+      .filter(t => t.length > 20) // Hopp over tomme/ubetydelige avsnitt
+    beskrivelse = avsnitt.join('\n\n') || null
   }
+
+  // Fallback: meta description
   if (!beskrivelse) {
     const metaDesc = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/)
     if (metaDesc) beskrivelse = renskTekst(metaDesc[1])
+  }
+
+  // Begrens til 5000 tegn (ca. 3–4 avsnitt)
+  if (beskrivelse && beskrivelse.length > 5000) {
+    beskrivelse = beskrivelse.substring(0, 5000).replace(/\s+\S*$/, '…')
   }
 
   // ---- Høringsinstanser ----
@@ -164,7 +185,7 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     publisert_dato,
     referanse,
     horing_type,
-    beskrivelse: beskrivelse ? beskrivelse.substring(0, 1000) : null,
+    beskrivelse,
     horing_instanser: instanser,
   }
 }
