@@ -159,46 +159,112 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     horing_type = 'muntlig'
   }
 
-  // ---- Beskrivelse: hent hele høringsbrev-teksten ----
-  // regjeringen.no legger brødteksten i <article> eller div.article-body.
-  // Vi samler alle <p>-tagger og kutter ved høringsinstans-seksjonen.
-  let beskrivelse: string | null = null
+  // ---- Beskrivelse ----
+  // Strategi (prioritert):
+  // 1. article-ingress  — kortfattet intro-avsnitt alltid skrevet av departementet
+  // 2. høringsbrev-faktaboks (id="horingsbrev") — selve brevteksten der den finnes inline
+  // 3. JSON-LD description — god fallback når brevteksten kun er PDF
+  // 4. meta description   — siste utvei
 
-  // Prøv å finne article-body eller article-element
-  const articleBodyMatch =
-    html.match(/<div[^>]*class="[^"]*article-body[^"]*"[^>]*>([\s\S]*?)(?:<\/article>|<section[^>]*class="[^"]*hearing-instances[^"]*"|<h2[^>]*>[^<]*[Hh]øringsinstans)/i)
-    ?? html.match(/<article[^>]*>([\s\S]*?)(?:<section[^>]*class="[^"]*hearing-instances[^"]*"|<h2[^>]*>[^<]*[Hh]øringsinstans)/i)
-    ?? html.match(/<div[^>]*class="[^"]*article-body[^"]*"[^>]*>([\s\S]*)/i)
+  // 1. Ingress
+  const ingressMatch = html.match(/<div[^>]*class="[^"]*article-ingress[^"]*"[^>]*>([\s\S]*?)<\/div>/)
+  const ingress = ingressMatch
+    ? renskTekst(ingressMatch[1].replace(/<[^>]+>/g, ''))
+    : null
 
-  if (articleBodyMatch) {
-    const bodyHtml = articleBodyMatch[1]
-    // Hent alle <p>-tagger
-    const paraMatches = [...bodyHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+  // 2. Høringsbrev-tekst fra faktaboksen (stopper ved neste faktaboks eller høringsinstanser)
+  let brevTekst: string | null = null
+  const brevStart = html.indexOf('id="horingsbrev"')
+  if (brevStart !== -1) {
+    // Finn slutten: neste <div class="factbox"> eller høringsinstanser
+    const neste = html.indexOf('<div class="factbox">', brevStart + 20)
+    const brevHtml = neste !== -1
+      ? html.substring(brevStart, neste)
+      : html.substring(brevStart, brevStart + 8000)
+
+    const paraMatches = [...brevHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    const BOILERPLATE = [
+      /^Vår ref\./i,
+      /Høringsuttalelser er offentlige/i,
+      /Også andre enn de som/i,
+      /For å avgi høringsuttalelse/i,
+      /Send inn høringssvar/i,
+      /kan også sendes til/i,
+      /Med hilsen/i,
+      /^\s*$/, // tom
+    ]
     const avsnitt = paraMatches
       .map(m => renskTekst(m[1].replace(/<[^>]+>/g, '')))
-      .filter(t => t.length > 20) // Hopp over tomme/ubetydelige avsnitt
-    beskrivelse = avsnitt.join('\n\n') || null
+      .filter(t => {
+        if (t.length < 20) return false
+        if (BOILERPLATE.some(re => re.test(t))) return false
+        return true
+      })
+    brevTekst = avsnitt.length > 0 ? avsnitt.join('\n\n') : null
   }
 
-  // Fallback: meta description
+  // Slå sammen ingress + brevtekst
+  let beskrivelse: string | null = null
+  if (ingress && brevTekst) {
+    beskrivelse = ingress + '\n\n' + brevTekst
+  } else {
+    beskrivelse = ingress || brevTekst
+  }
+
+  // 3. JSON-LD description (god og konsistent på regjeringen.no)
+  if (!beskrivelse) {
+    const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/)
+    if (jsonLdMatch) {
+      try {
+        const jsonLd = JSON.parse(jsonLdMatch[1])
+        if (jsonLd.description) beskrivelse = renskTekst(jsonLd.description)
+      } catch { /* ignorer ugyldig JSON */ }
+    }
+  }
+
+  // 4. Meta description
   if (!beskrivelse) {
     const metaDesc = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/)
     if (metaDesc) beskrivelse = renskTekst(metaDesc[1])
   }
 
-  // Begrens til 5000 tegn (ca. 3–4 avsnitt)
+  // Begrens til 5000 tegn
   if (beskrivelse && beskrivelse.length > 5000) {
     beskrivelse = beskrivelse.substring(0, 5000).replace(/\s+\S*$/, '…')
   }
 
   // ---- Høringsinstanser ----
+  // regjeringen.no bruker en faktaboks med id="horingsinstanser" og <p>-tagger (ikke <ul><li>)
   const instanser: string[] = []
-  const instansBlock = html.match(/[Hh]øringsinstans[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/)
-  if (instansBlock) {
-    const liMatches = [...instansBlock[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
-    for (const [, li] of liMatches) {
-      const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
-      if (navn) instanser.push(navn)
+  const instansStart = html.indexOf('id="horingsinstanser"')
+  if (instansStart !== -1) {
+    const nesteFactbox = html.indexOf('<div class="factbox">', instansStart + 20)
+    const instansHtml = nesteFactbox !== -1
+      ? html.substring(instansStart, nesteFactbox)
+      : html.substring(instansStart, instansStart + 20000)
+    // Prøv <p>-tagger (nytt format)
+    const pMatches = [...instansHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    for (const [, p] of pMatches) {
+      const navn = renskTekst(p.replace(/<[^>]+>/g, ''))
+      if (navn && navn.length > 2) instanser.push(navn)
+    }
+    // Fallback: <li>-tagger (gammelt format)
+    if (instanser.length === 0) {
+      const liMatches = [...instansHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+      for (const [, li] of liMatches) {
+        const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
+        if (navn) instanser.push(navn)
+      }
+    }
+  } else {
+    // Eldre fallback for sider uten factbox-struktur
+    const instansBlock = html.match(/[Hh]øringsinstans[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/)
+    if (instansBlock) {
+      const liMatches = [...instansBlock[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
+      for (const [, li] of liMatches) {
+        const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
+        if (navn) instanser.push(navn)
+      }
     }
   }
 
