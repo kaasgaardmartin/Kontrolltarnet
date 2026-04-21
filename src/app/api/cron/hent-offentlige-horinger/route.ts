@@ -13,8 +13,30 @@ function parseNorskDato(str: string): string | null {
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
+function dekodHtmlEntiteter(str: string): string {
+  return str
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_, dec) =>
+      String.fromCodePoint(parseInt(dec, 10))
+    )
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&oslash;/gi, 'ø')
+    .replace(/&aelig;/gi, 'æ')
+    .replace(/&aring;/gi, 'å')
+    .replace(/&Oslash;/g, 'Ø')
+    .replace(/&AElig;/g, 'Æ')
+    .replace(/&Aring;/g, 'Å')
+}
+
 function rensk(str: string): string {
-  return str.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+  return dekodHtmlEntiteter(str.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim()
 }
 
 interface HoringListeItem {

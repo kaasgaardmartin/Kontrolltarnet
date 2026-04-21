@@ -33,8 +33,34 @@ export function parseNorskDato(str: string): string | null {
   return null
 }
 
+// Dekoder HTML-entiteter: &#xF8; → ø, &amp; → & osv.
+function dekodHtmlEntiteter(str: string): string {
+  return str
+    // Hex-entiteter: &#xF8; &#XF8;
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16))
+    )
+    // Desimal-entiteter: &#248;
+    .replace(/&#(\d+);/g, (_, dec) =>
+      String.fromCodePoint(parseInt(dec, 10))
+    )
+    // Vanlige navngitte entiteter
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&oslash;/gi, 'ø')
+    .replace(/&aelig;/gi, 'æ')
+    .replace(/&aring;/gi, 'å')
+    .replace(/&Oslash;/g, 'Ø')
+    .replace(/&AElig;/g, 'Æ')
+    .replace(/&Aring;/g, 'Å')
+}
+
 export function renskTekst(str: string): string {
-  return str.replace(/\s+/g, ' ').trim()
+  return dekodHtmlEntiteter(str).replace(/\s+/g, ' ').trim()
 }
 
 // Henter og parser en regjeringen.no høring-side
