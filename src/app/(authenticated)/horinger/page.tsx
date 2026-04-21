@@ -65,7 +65,7 @@ export default function HoringerSide() {
       const s = sok.toLowerCase()
       if (!h.tittel.toLowerCase().includes(s) &&
           !(h.departement?.toLowerCase().includes(s)) &&
-          !(h.utvalg?.toLowerCase().includes(s))) return false
+          !h.utvalg.some(u => u.toLowerCase().includes(s))) return false
     }
     if (statusFilter !== 'alle' && h.status !== statusFilter) return false
     if (utvalgFilter && !h.utvalg.includes(utvalgFilter)) return false
