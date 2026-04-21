@@ -288,12 +288,17 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     const seksjon = nesteFactbox !== -1
       ? html.substring(start, nesteFactbox)
       : html.substring(start, start + 5000)
-    const lenkeMønster = /<a[^>]*href="(\/contentassets\/[^"]+\.pdf)"[^>]*title="([^"]+)"/gi
+    // Hent hele <a>-taggen, trekk ut href og title uavhengig av rekkefølge
+    const lenkeMønster = /<a\s([^>]*contentassets[^>]*\.pdf[^>]*)>/gi
     let m: RegExpExecArray | null
     while ((m = lenkeMønster.exec(seksjon)) !== null) {
+      const attrs = m[1]
+      const hrefMatch = attrs.match(/href="(\/contentassets\/[^"]+\.pdf)"/)
+      const titleMatch = attrs.match(/title="([^"]+)"/)
+      if (!hrefMatch) continue
       vedlegg.push({
-        tittel: renskTekst(m[2]),
-        url: `https://www.regjeringen.no${m[1]}`,
+        tittel: titleMatch ? renskTekst(titleMatch[1]) : hrefMatch[1].split('/').pop() ?? 'Vedlegg',
+        url: `https://www.regjeringen.no${hrefMatch[1]}`,
         type,
       })
     }
