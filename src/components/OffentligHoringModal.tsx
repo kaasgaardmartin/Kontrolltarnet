@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { OffentligHoring, OffentligHoringStatus, HoringType } from '@/lib/actions'
+import type { OffentligHoring, OffentligHoringStatus, HoringType, OffentligHoringVedlegg } from '@/lib/actions'
 import { opprettOffentligHoring, oppdaterOffentligHoring, slettOffentligHoring } from '@/lib/actions'
 import type { HoringScrapeResultat } from '@/app/api/horing-scrape/route'
 
@@ -93,6 +93,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   const [horingType, setHoringType] = useState<HoringType | ''>(horing?.horing_type || '')
   const [beskrivelse, setBeskrivelse] = useState(horing?.beskrivelse || '')
   const [horingInstanser, setHoringInstanser] = useState<string[]>(horing?.horing_instanser || [])
+  const [vedlegg, setVedlegg] = useState<OffentligHoringVedlegg[]>(horing?.vedlegg || [])
 
   // Intern behandling
   const [status, setStatus] = useState<OffentligHoringStatus>(horing?.status || 'innkommet')
@@ -137,6 +138,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
       if (res.horing_type) setHoringType(res.horing_type)
       if (res.beskrivelse) setBeskrivelse(res.beskrivelse)
       if (res.horing_instanser?.length) setHoringInstanser(res.horing_instanser)
+      if (res.vedlegg?.length) setVedlegg(res.vedlegg)
       setUrlHentet(true)
     } catch {
       setUrlFeil('Nettverksfeil — prøv igjen')
@@ -163,6 +165,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
       horing_type: horingType || null,
       beskrivelse: beskrivelse || null,
       horing_instanser: horingInstanser,
+      vedlegg,
       status,
       utvalg,
       ansvarlig_id: ansvarligId || null,
@@ -356,6 +359,41 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent resize-none"
                 />
               </div>
+
+              {/* Vedlegg (PDF-lenker) */}
+              {vedlegg.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    Vedlegg
+                  </label>
+                  <div className="space-y-1.5">
+                    {vedlegg.map((v, i) => (
+                      <a
+                        key={i}
+                        href={v.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-200 transition-colors group text-sm"
+                      >
+                        <svg className="w-4 h-4 text-red-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/>
+                          <path d="M8.5 14.5h7v1h-7zm0 2.5h5v1h-5z" opacity=".5"/>
+                        </svg>
+                        <span className="flex-1 text-gray-700 group-hover:text-blue-700 truncate">{v.tittel}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                          v.type === 'horingsbrev'
+                            ? 'bg-blue-100 text-blue-700'
+                            : v.type === 'horingsnotat'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {v.type === 'horingsbrev' ? 'Høringsbrev' : v.type === 'horingsnotat' ? 'Høringsnotat' : 'Vedlegg'}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Høringsinstanser */}
               {horingInstanser.length > 0 && (

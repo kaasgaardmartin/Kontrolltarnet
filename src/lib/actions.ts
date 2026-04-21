@@ -1452,6 +1452,12 @@ export async function hentSakAbonnement(sakId: string): Promise<boolean> {
 export type OffentligHoringStatus = 'innkommet' | 'til_vurdering' | 'svarer' | 'svarer_ikke' | 'levert'
 export type HoringType = 'skriftlig' | 'muntlig' | 'begge'
 
+export interface OffentligHoringVedlegg {
+  tittel: string
+  url: string
+  type: 'horingsbrev' | 'horingsnotat' | 'annet'
+}
+
 export interface OffentligHoring {
   id: string
   organisasjon_id: string
@@ -1464,6 +1470,7 @@ export interface OffentligHoring {
   horing_type: HoringType | null
   beskrivelse: string | null
   horing_instanser: string[]
+  vedlegg: OffentligHoringVedlegg[]
   status: OffentligHoringStatus
   utvalg: string[]            // kan tildeles flere utvalg
   ansvarlig_id: string | null
@@ -1524,6 +1531,7 @@ export async function opprettOffentligHoring(input: {
   horing_type?: HoringType | null
   beskrivelse?: string | null
   horing_instanser?: string[]
+  vedlegg?: OffentligHoringVedlegg[]
   status?: OffentligHoringStatus
   utvalg?: string[]
   ansvarlig_id?: string | null
@@ -1551,6 +1559,7 @@ export async function opprettOffentligHoring(input: {
       horing_type: input.horing_type || null,
       beskrivelse: input.beskrivelse || null,
       horing_instanser: input.horing_instanser || [],
+      vedlegg: input.vedlegg || [],
       status: input.status || 'innkommet',
       utvalg: input.utvalg || [],
       ansvarlig_id: input.ansvarlig_id || null,
@@ -1577,6 +1586,7 @@ export async function oppdaterOffentligHoring(
     horing_type: HoringType | null
     beskrivelse: string | null
     horing_instanser: string[]
+    vedlegg: OffentligHoringVedlegg[]
     status: OffentligHoringStatus
     utvalg: string[]
     ansvarlig_id: string | null

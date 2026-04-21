@@ -199,6 +199,7 @@ export async function GET(request: NextRequest) {
           horing_type: d?.horing_type ?? null,
           beskrivelse: d?.beskrivelse ?? null,
           horing_instanser: d?.horing_instanser ?? [],
+          vedlegg: d?.vedlegg ?? [],
           status: 'innkommet' as const,
           utvalg: [] as string[],
         }

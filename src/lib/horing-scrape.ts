@@ -1,5 +1,11 @@
 // Delt hjelpemodul for skraping av høringssider fra regjeringen.no
 
+export interface HoringVedlegg {
+  tittel: string
+  url: string
+  type: 'horingsbrev' | 'horingsnotat' | 'annet'
+}
+
 export interface HoringScrapeResultat {
   tittel: string
   departement: string | null
@@ -9,6 +15,7 @@ export interface HoringScrapeResultat {
   horing_type: 'skriftlig' | 'muntlig' | 'begge' | null
   beskrivelse: string | null
   horing_instanser: string[]
+  vedlegg: HoringVedlegg[]
 }
 
 // Prøver å parse en norsk dato-streng til YYYY-MM-DD
@@ -268,6 +275,33 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     }
   }
 
+  // ---- Vedlegg (PDF-lenker fra horingsbrev og horingsnotater faktabokser) ----
+  const vedlegg: HoringVedlegg[] = []
+
+  function hentPdfLenker(
+    faktaboksId: string,
+    type: HoringVedlegg['type']
+  ) {
+    const start = html.indexOf(`id="${faktaboksId}"`)
+    if (start === -1) return
+    const nesteFactbox = html.indexOf('<div class="factbox">', start + 20)
+    const seksjon = nesteFactbox !== -1
+      ? html.substring(start, nesteFactbox)
+      : html.substring(start, start + 5000)
+    const lenkeMønster = /<a[^>]*href="(\/contentassets\/[^"]+\.pdf)"[^>]*title="([^"]+)"/gi
+    let m: RegExpExecArray | null
+    while ((m = lenkeMønster.exec(seksjon)) !== null) {
+      vedlegg.push({
+        tittel: renskTekst(m[2]),
+        url: `https://www.regjeringen.no${m[1]}`,
+        type,
+      })
+    }
+  }
+
+  hentPdfLenker('horingsbrev', 'horingsbrev')
+  hentPdfLenker('horingsnotater', 'horingsnotat')
+
   return {
     tittel,
     departement,
@@ -277,5 +311,6 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     horing_type,
     beskrivelse,
     horing_instanser: instanser,
+    vedlegg,
   }
 }
