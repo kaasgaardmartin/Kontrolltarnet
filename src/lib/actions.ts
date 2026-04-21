@@ -214,10 +214,13 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
     const harAktiveHoringer = aktiveHoringer.length > 0
 
     // Samle alle frister (fremtidige og passerte) med type og skriftlig-flagg
+    // Fremtidige: kun fra aktive/planlagte høringer
+    // Passerte: fra alle høringer (inkl. Avholdt) som fallback for å vise siste aktivitet
     type FristEntry = { dato: string; type: 'innspill' | 'anmodning' | 'start'; skriftlig: boolean }
     const fremmedigeFrister: FristEntry[] = []
     const passerateFrister: FristEntry[] = []
-    for (const h of aktiveHoringer) {
+    for (const h of horinger) {
+      const erAktiv = !h.status || aktiveStatuser.includes(h.status)
       const kandidater: { dato: string | null; type: 'innspill' | 'anmodning' | 'start' }[] = [
         { dato: h.innspillsfrist, type: 'innspill' },
         { dato: h.anmodningsfrist, type: 'anmodning' },
@@ -226,8 +229,11 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
       for (const { dato, type } of kandidater) {
         if (!dato) continue
         const entry: FristEntry = { dato, type, skriftlig: h.skriftlig ?? true }
-        if (new Date(dato) >= nå) fremmedigeFrister.push(entry)
-        else passerateFrister.push(entry)
+        if (new Date(dato) >= nå) {
+          if (erAktiv) fremmedigeFrister.push(entry) // kun aktive høringer fremover
+        } else {
+          passerateFrister.push(entry) // alle høringer bakover
+        }
       }
     }
     // Foretrekk nærmeste fremtidige frist; fall back til nyligste passerte
