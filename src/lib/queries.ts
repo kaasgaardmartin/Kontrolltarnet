@@ -15,6 +15,8 @@ import {
   hentKomiteerMedMandater,
   hentAntallUlesteVarsler,
   hentHoringer,
+  hentOffentligeHoringer,
+  hentOffentligHoring,
 } from './actions'
 
 // ============================================================
@@ -35,6 +37,8 @@ export const queryKeys = {
   komiteMandater: (komiteId: string) => ['komiteMandater', komiteId] as const,
   sakAbonnement: (sakId: string) => ['sakAbonnement', sakId] as const,
   horinger: (sakId: string) => ['horinger', sakId] as const,
+  offentligeHoringer: ['offentligeHoringer'] as const,
+  offentligHoring: (id: string) => ['offentligHoring', id] as const,
 }
 
 // ============================================================
@@ -151,6 +155,23 @@ export function useUlesteVarsler() {
   })
 }
 
+/** Alle offentlige høringer */
+export function useOffentligeHoringer() {
+  return useQuery({
+    queryKey: queryKeys.offentligeHoringer,
+    queryFn: hentOffentligeHoringer,
+  })
+}
+
+/** En enkelt offentlig høring */
+export function useOffentligHoring(id: string) {
+  return useQuery({
+    queryKey: queryKeys.offentligHoring(id),
+    queryFn: () => hentOffentligHoring(id),
+    enabled: !!id,
+  })
+}
+
 // ============================================================
 // Invaliderings-helper
 // ============================================================
@@ -182,6 +203,11 @@ export function useInvaliderSakData() {
       queryClient.invalidateQueries({ queryKey: queryKeys.mandater })
       queryClient.invalidateQueries({ queryKey: queryKeys.komiteer })
       queryClient.invalidateQueries({ queryKey: queryKeys.komiteerMedMandater })
+    },
+    /** Invalider offentlige høringer */
+    invaliderOffentligeHoringer: (id?: string) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.offentligeHoringer })
+      if (id) queryClient.invalidateQueries({ queryKey: queryKeys.offentligHoring(id) })
     },
   }
 }

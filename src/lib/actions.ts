@@ -1444,3 +1444,178 @@ export async function hentSakAbonnement(sakId: string): Promise<boolean> {
 
   return data?.aktiv ?? false
 }
+
+// ============================================================
+// Offentlige høringer (regjeringen.no)
+// ============================================================
+
+export type OffentligHoringStatus = 'innkommet' | 'til_vurdering' | 'svarer' | 'svarer_ikke' | 'levert'
+export type HoringType = 'skriftlig' | 'muntlig' | 'begge'
+
+export interface OffentligHoring {
+  id: string
+  organisasjon_id: string
+  tittel: string
+  departement: string | null
+  regjeringen_url: string | null
+  referanse: string | null
+  publisert_dato: string | null
+  horingsfrist: string | null
+  horing_type: HoringType | null
+  beskrivelse: string | null
+  horing_instanser: string[]
+  status: OffentligHoringStatus
+  utvalg: string[]            // kan tildeles flere utvalg
+  ansvarlig_id: string | null
+  intern_frist: string | null
+  intern_notat: string | null
+  opprettet_av: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  ansvarlig?: { navn: string } | null
+  opprettet_av_bruker?: { navn: string } | null
+}
+
+export async function hentOffentligeHoringer(): Promise<OffentligHoring[]> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const { data } = await supabase
+    .from('offentlige_horinger')
+    .select(`
+      *,
+      ansvarlig:brukere!ansvarlig_id(navn),
+      opprettet_av_bruker:brukere!opprettet_av(navn)
+    `)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .order('created_at', { ascending: false })
+
+  return (data ?? []) as OffentligHoring[]
+}
+
+export async function hentOffentligHoring(id: string): Promise<OffentligHoring | null> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return null
+
+  const { data } = await supabase
+    .from('offentlige_horinger')
+    .select(`
+      *,
+      ansvarlig:brukere!ansvarlig_id(navn),
+      opprettet_av_bruker:brukere!opprettet_av(navn)
+    `)
+    .eq('id', id)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .single()
+
+  return data as OffentligHoring | null
+}
+
+export async function opprettOffentligHoring(input: {
+  tittel: string
+  departement?: string | null
+  regjeringen_url?: string | null
+  referanse?: string | null
+  publisert_dato?: string | null
+  horingsfrist?: string | null
+  horing_type?: HoringType | null
+  beskrivelse?: string | null
+  horing_instanser?: string[]
+  status?: OffentligHoringStatus
+  utvalg?: string[]
+  ansvarlig_id?: string | null
+  intern_frist?: string | null
+  intern_notat?: string | null
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const tittelFeil = validerTekst(input.tittel, MAX_TITTEL, 'Tittel')
+  if (tittelFeil) return { success: false, error: tittelFeil }
+
+  const { data, error } = await supabase
+    .from('offentlige_horinger')
+    .insert({
+      organisasjon_id: bruker.organisasjon_id,
+      tittel: input.tittel,
+      departement: input.departement || null,
+      regjeringen_url: input.regjeringen_url || null,
+      referanse: input.referanse || null,
+      publisert_dato: input.publisert_dato || null,
+      horingsfrist: input.horingsfrist || null,
+      horing_type: input.horing_type || null,
+      beskrivelse: input.beskrivelse || null,
+      horing_instanser: input.horing_instanser || [],
+      status: input.status || 'innkommet',
+      utvalg: input.utvalg || [],
+      ansvarlig_id: input.ansvarlig_id || null,
+      intern_frist: input.intern_frist || null,
+      intern_notat: input.intern_notat || null,
+      opprettet_av: bruker.id,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, id: data.id }
+}
+
+export async function oppdaterOffentligHoring(
+  id: string,
+  input: Partial<{
+    tittel: string
+    departement: string | null
+    regjeringen_url: string | null
+    referanse: string | null
+    publisert_dato: string | null
+    horingsfrist: string | null
+    horing_type: HoringType | null
+    beskrivelse: string | null
+    horing_instanser: string[]
+    status: OffentligHoringStatus
+    utvalg: string[]
+    ansvarlig_id: string | null
+    intern_frist: string | null
+    intern_notat: string | null
+  }>
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  if (input.tittel) {
+    const tittelFeil = validerTekst(input.tittel, MAX_TITTEL, 'Tittel')
+    if (tittelFeil) return { success: false, error: tittelFeil }
+  }
+
+  const { error } = await supabase
+    .from('offentlige_horinger')
+    .update(input)
+    .eq('id', id)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function slettOffentligHoring(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { error } = await supabase
+    .from('offentlige_horinger')
+    .delete()
+    .eq('id', id)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}

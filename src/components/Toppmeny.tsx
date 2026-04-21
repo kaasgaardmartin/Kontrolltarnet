@@ -119,6 +119,7 @@ export default function Toppmeny() {
 
   const navItems = [
     { href: '/', label: 'Oversikt' },
+    { href: '/horinger', label: 'Høringer' },
     { href: '/mine-oppgaver', label: 'Mine oppgaver' },
     { href: '/arkiv', label: 'Arkiv' },
     { href: '/admin', label: 'Komiteer' },
@@ -154,7 +155,7 @@ export default function Toppmeny() {
                   key={item.href}
                   href={item.href}
                   className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                    (item.href === '/' ? pathname === '/' : pathname === item.href)
+                    (item.href === '/' ? pathname === '/' : pathname.startsWith(item.href))
                       ? 'bg-[#4A9EDB]/20 text-[#4A9EDB]'
                       : 'text-gray-300 hover:text-white hover:bg-white/10'
                   }`}
