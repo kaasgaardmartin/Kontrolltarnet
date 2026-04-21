@@ -33,23 +33,15 @@ export function parseNorskDato(str: string): string | null {
   return null
 }
 
-// Dekoder HTML-entiteter: &#xF8; → ø, &amp; → & osv.
-function dekodHtmlEntiteter(str: string): string {
+// Dekoder kun tegn-entiteter (æøå osv.) — beholder &lt; &gt; &amp; for å ikke ødelegge HTML-struktur
+function dekodTegnEntiteter(str: string): string {
   return str
-    // Hex-entiteter: &#xF8; &#XF8;
     .replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) =>
       String.fromCodePoint(parseInt(hex, 16))
     )
-    // Desimal-entiteter: &#248;
     .replace(/&#(\d+);/g, (_, dec) =>
       String.fromCodePoint(parseInt(dec, 10))
     )
-    // Vanlige navngitte entiteter
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .replace(/&oslash;/gi, 'ø')
     .replace(/&aelig;/gi, 'æ')
@@ -57,6 +49,22 @@ function dekodHtmlEntiteter(str: string): string {
     .replace(/&Oslash;/g, 'Ø')
     .replace(/&AElig;/g, 'Æ')
     .replace(/&Aring;/g, 'Å')
+    .replace(/&szlig;/g, 'ß')
+    .replace(/&eacute;/gi, 'é')
+    .replace(/&egrave;/gi, 'è')
+    .replace(/&auml;/gi, 'ä')
+    .replace(/&ouml;/gi, 'ö')
+    .replace(/&uuml;/gi, 'ü')
+}
+
+// Dekoder alle HTML-entiteter inkl. strukturelle — brukes på tekstinnhold
+function dekodHtmlEntiteter(str: string): string {
+  return dekodTegnEntiteter(str)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
 }
 
 export function renskTekst(str: string): string {
@@ -70,7 +78,8 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     signal: AbortSignal.timeout(10_000),
   })
   if (!resp.ok) throw new Error(`HTTP ${resp.status} fra regjeringen.no`)
-  const html = await resp.text()
+  // Dekod tegn-entiteter (&#248; → ø osv.) på hele HTML-en slik at regex-søk etter æøå fungerer
+  const html = dekodTegnEntiteter(await resp.text())
 
   // ---- Tittel ----
   const tittelMatch = html.match(/<h1[^>]*class="[^"]*article-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/)
