@@ -104,10 +104,11 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createServiceRoleClient()
 
-    // Hent alle organisasjoner
+    // Hent kun organisasjoner med auto-import aktivert
     const { data: orgs, error: orgFeil } = await supabase
       .from('organisasjoner')
       .select('id')
+      .eq('auto_import_horinger', true)
     if (orgFeil) throw new Error(`Org-henting feilet: ${orgFeil.message}`)
     if (!orgs?.length) {
       return NextResponse.json({ melding: 'Ingen organisasjoner funnet', antall_nye: 0 })
