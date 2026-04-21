@@ -55,10 +55,10 @@ export default function HoringerSide() {
   const [utvalgFilter, setUtvalgFilter] = useState('')
   const [modalHoring, setModalHoring] = useState<OffentligHoring | null | undefined>(undefined)
 
-  // Unique utvalg in data
+  // Unique utvalg in data (flatMap since utvalg is string[])
   const utvalg = Array.from(new Set(
-    horinger.map(h => h.utvalg).filter((u): u is string => !!u)
-  )).sort()
+    horinger.flatMap(h => h.utvalg)
+  )).filter(Boolean).sort()
 
   const filtrert = horinger.filter(h => {
     if (sok) {
@@ -68,7 +68,7 @@ export default function HoringerSide() {
           !(h.utvalg?.toLowerCase().includes(s))) return false
     }
     if (statusFilter !== 'alle' && h.status !== statusFilter) return false
-    if (utvalgFilter && h.utvalg !== utvalgFilter) return false
+    if (utvalgFilter && !h.utvalg.includes(utvalgFilter)) return false
     return true
   })
 
@@ -203,8 +203,12 @@ export default function HoringerSide() {
                       {h.departement || <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      {h.utvalg
-                        ? <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">{h.utvalg}</span>
+                      {h.utvalg.length > 0
+                        ? <div className="flex flex-wrap gap-1">
+                            {h.utvalg.map(u => (
+                              <span key={u} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">{u}</span>
+                            ))}
+                          </div>
                         : <span className="text-gray-300">—</span>
                       }
                     </td>
