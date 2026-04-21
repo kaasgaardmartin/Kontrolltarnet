@@ -80,8 +80,12 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     : 'Ukjent tittel'
 
   // ---- Departement ----
-  const deptMatch = html.match(/class="[^"]*article-source[^"]*"[^>]*>([\s\S]*?)<\//)
+  // Prøv article-source-klasse, deretter "Publisert av:", deretter "X sender med dette"
+  const deptMatch =
+    html.match(/class="[^"]*article-source[^"]*"[^>]*>([\s\S]*?)<\//)
     || html.match(/Publisert av:\s*<[^>]+>([\s\S]*?)<\//)
+    || html.match(/([A-ZÆØÅ][a-zæøåA-ZÆØÅ\s-]+(?:departementet|direktoratet|tilsynet|rådet|Statsministerens kontor))\s+sender\s+med\s+dette/u)
+    || html.match(/<meta[^>]*(?:name="author"|property="og:site_name")[^>]*content="([^"]+)"/)
   const departement = deptMatch ? renskTekst(deptMatch[1].replace(/<[^>]+>/g, '')) : null
 
   // ---- Høringsfrist og publiseringsdato ----
@@ -105,8 +109,19 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
 
   // Fallback: søk i rå tekst
   if (!horingsfrist) {
-    const fristMatch = html.match(/[Hh]øringsfrist[:\s]*(\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i)
-    if (fristMatch) horingsfrist = parseNorskDato(fristMatch[1])
+    // Format 1: "Høringsfrist: DD.MM.YYYY"
+    const f1 = html.match(/[Hh]øringsfrist[:\s]+(\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i)
+    if (f1) horingsfrist = parseNorskDato(f1[1])
+  }
+  if (!horingsfrist) {
+    // Format 2: "Frist for å sende inn høringssvar er DD. månedsnavn YYYY"
+    const f2 = html.match(/[Ff]rist\s+for\s+å\s+sende\s+inn\s+høringssvar\s+er\s+(\d{1,2}\.?\s*(?:\d{1,2}\.\d{4}|(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4}))/i)
+    if (f2) horingsfrist = parseNorskDato(f2[1])
+  }
+  if (!horingsfrist) {
+    // Format 3: "Høringsfristen er DD. månedsnavn YYYY"
+    const f3 = html.match(/[Hh]øringsfristen\s+er\s+(\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i)
+    if (f3) horingsfrist = parseNorskDato(f3[1])
   }
   if (!publisert_dato) {
     const pubMatch = html.match(/[Pp]ublisert[:\s]*(\d{1,2}\.\d{1,2}\.\d{4})/i)
