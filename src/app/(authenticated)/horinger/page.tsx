@@ -23,6 +23,43 @@ const STATUS_STIL: Record<OffentligHoringStatus, { bg: string; text: string; dot
 
 const ALLE_STATUSER: OffentligHoringStatus[] = ['innkommet', 'til_vurdering', 'svarer', 'svarer_ikke', 'levert']
 
+// Departement-forkortelser
+const DEP_FORKORTELSE: [string, string][] = [
+  ['finansdep', 'FIN'],
+  ['justis', 'JD'],
+  ['nærings', 'NFD'],
+  ['kommunal', 'KDD'],
+  ['arbeids', 'AID'],
+  ['helse', 'HOD'],
+  ['kunnskap', 'KD'],
+  ['utenriks', 'UD'],
+  ['forsvar', 'FD'],
+  ['samferdsel', 'SD'],
+  ['klima', 'KLD'],
+  ['olje', 'OED'],
+  ['landbruk', 'LMD'],
+  ['kultur', 'KUD'],
+  ['barne', 'BFD'],
+  ['digital', 'DFD'],
+  ['statsminister', 'SMK'],
+]
+
+function kortDep(dep: string | null | undefined): string {
+  if (!dep) return '—'
+  const lower = dep.toLowerCase()
+  for (const [key, abbr] of DEP_FORKORTELSE) {
+    if (lower.includes(key)) return abbr
+  }
+  return dep.slice(0, 3).toUpperCase()
+}
+
+function formaterDato(d: string | null): string {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })
+}
+
+type SortKolonne = 'publisert_dato' | 'horingsfrist' | 'intern_frist'
+
 function FristChip({ dato }: { dato: string }) {
   const d = new Date(dato)
   const now = new Date()
@@ -46,6 +83,19 @@ function FristChip({ dato }: { dato: string }) {
   )
 }
 
+function SortPil({ aktiv, retning }: { aktiv: boolean; retning: 'asc' | 'desc' }) {
+  return (
+    <span className={`ml-1 inline-flex flex-col gap-px ${aktiv ? 'text-[#4A9EDB]' : 'text-gray-300'}`}>
+      <svg className={`w-2.5 h-2.5 ${aktiv && retning === 'asc' ? 'text-[#4A9EDB]' : 'text-gray-300'}`} viewBox="0 0 10 6" fill="currentColor">
+        <path d="M5 0L10 6H0L5 0Z" />
+      </svg>
+      <svg className={`w-2.5 h-2.5 ${aktiv && retning === 'desc' ? 'text-[#4A9EDB]' : 'text-gray-300'}`} viewBox="0 0 10 6" fill="currentColor">
+        <path d="M5 6L0 0H10L5 6Z" />
+      </svg>
+    </span>
+  )
+}
+
 export default function HoringerSide() {
   const { data: horinger = [], isLoading } = useOffentligeHoringer()
   const { data: brukere = [] } = useOrgBrukere()
@@ -55,6 +105,18 @@ export default function HoringerSide() {
   const [statusFilter, setStatusFilter] = useState<OffentligHoringStatus | 'alle'>('alle')
   const [utvalgFilter, setUtvalgFilter] = useState('')
   const [modalHoring, setModalHoring] = useState<OffentligHoring | null | undefined>(undefined)
+  const [sortBy, setSortBy] = useState<SortKolonne | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function toggleSort(kolonne: SortKolonne) {
+    if (sortBy === kolonne) {
+      if (sortDir === 'asc') setSortDir('desc')
+      else { setSortBy(null); setSortDir('asc') }
+    } else {
+      setSortBy(kolonne)
+      setSortDir('asc')
+    }
+  }
 
   // Unique utvalg in data (flatMap since utvalg is string[])
   const utvalg = Array.from(new Set(
@@ -72,6 +134,19 @@ export default function HoringerSide() {
     if (utvalgFilter && !h.utvalg.includes(utvalgFilter)) return false
     return true
   })
+
+  const sortert = sortBy
+    ? [...filtrert].sort((a, b) => {
+        const av = a[sortBy] ?? ''
+        const bv = b[sortBy] ?? ''
+        if (av === bv) return 0
+        if (av === '') return 1
+        if (bv === '') return -1
+        return sortDir === 'asc'
+          ? av < bv ? -1 : 1
+          : av > bv ? -1 : 1
+      })
+    : filtrert
 
   // Count per status for badges
   const teller = ALLE_STATUSER.reduce((acc, s) => {
@@ -179,26 +254,52 @@ export default function HoringerSide() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Tittel</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Departement</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Dep.</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide hidden lg:table-cell">Utvalg</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Frist</th>
+                <th
+                  className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => toggleSort('publisert_dato')}
+                >
+                  <span className="inline-flex items-center">
+                    Sendt
+                    <SortPil aktiv={sortBy === 'publisert_dato'} retning={sortDir} />
+                  </span>
+                </th>
+                <th
+                  className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => toggleSort('horingsfrist')}
+                >
+                  <span className="inline-flex items-center">
+                    Høringsfrist
+                    <SortPil aktiv={sortBy === 'horingsfrist'} retning={sortDir} />
+                  </span>
+                </th>
+                <th
+                  className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => toggleSort('intern_frist')}
+                >
+                  <span className="inline-flex items-center">
+                    Intern frist
+                    <SortPil aktiv={sortBy === 'intern_frist'} retning={sortDir} />
+                  </span>
+                </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Status</th>
               </tr>
             </thead>
             <tbody>
-              {filtrert.map((h, i) => {
+              {sortert.map((h, i) => {
                 const stil = STATUS_STIL[h.status]
                 return (
                   <tr
                     key={h.id}
                     onClick={() => setModalHoring(h)}
-                    className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${i === filtrert.length - 1 ? 'border-b-0' : ''}`}
+                    className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${i === sortert.length - 1 ? 'border-b-0' : ''}`}
                   >
                     <td className="px-4 py-3">
                       <div className="font-medium text-[#0F1923] leading-snug">{h.tittel}</div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         {h.departement && (
-                          <span className="text-xs text-gray-400 md:hidden">{h.departement}</span>
+                          <span className="text-xs text-gray-400 md:hidden">{kortDep(h.departement)}</span>
                         )}
                         {h.regjeringen_url && (
                           <a
@@ -216,8 +317,10 @@ export default function HoringerSide() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 hidden md:table-cell">
-                      {h.departement || <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {kortDep(h.departement)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       {h.utvalg.length > 0
@@ -229,19 +332,23 @@ export default function HoringerSide() {
                         : <span className="text-gray-300">—</span>
                       }
                     </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">
+                      {h.publisert_dato
+                        ? formaterDato(h.publisert_dato)
+                        : <span className="text-gray-300">—</span>
+                      }
+                    </td>
                     <td className="px-4 py-3">
                       {h.horingsfrist
                         ? <FristChip dato={h.horingsfrist} />
                         : <span className="text-gray-300 text-xs">—</span>
                       }
-                      {h.intern_frist && (
-                        <div className="mt-1 flex items-center gap-1 text-xs text-gray-400">
-                          <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                          </svg>
-                          {new Date(h.intern_frist).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })}
-                        </div>
-                      )}
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {h.intern_frist
+                        ? <FristChip dato={h.intern_frist} />
+                        : <span className="text-gray-300 text-xs">—</span>
+                      }
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${stil.bg} ${stil.text}`}>
