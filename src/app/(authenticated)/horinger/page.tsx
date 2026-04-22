@@ -27,6 +27,7 @@ function FristChip({ dato }: { dato: string }) {
   const d = new Date(dato)
   const now = new Date()
   const dagerTil = Math.floor((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const datoTekst = d.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })
 
   const passert = dagerTil < 0
   const snart = !passert && dagerTil <= 7
@@ -40,7 +41,7 @@ function FristChip({ dato }: { dato: string }) {
       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
       </svg>
-      {passert ? 'Frist passert' : dagerTil === 0 ? 'I dag' : dagerTil === 1 ? 'I morgen' : `${dagerTil}d`}
+      {datoTekst}
     </span>
   )
 }
@@ -233,6 +234,14 @@ export default function HoringerSide() {
                         ? <FristChip dato={h.horingsfrist} />
                         : <span className="text-gray-300 text-xs">—</span>
                       }
+                      {h.intern_frist && (
+                        <div className="mt-1 flex items-center gap-1 text-xs text-gray-400">
+                          <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                          </svg>
+                          {new Date(h.intern_frist).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${stil.bg} ${stil.text}`}>
