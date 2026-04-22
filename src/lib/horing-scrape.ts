@@ -142,10 +142,16 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
   if (!publisert_dato) {
     const pubMatch = html.match(/[Pp]ublisert[:\s]*(\d{1,2}\.\d{1,2}\.\d{4})/i)
     if (pubMatch) publisert_dato = parseNorskDato(pubMatch[1])
-    const metaDateMatch = html.match(/<meta[^>]*(?:name="date"|property="article:published_time")[^>]*content="([^"]+)"/)
-    if (!publisert_dato && metaDateMatch) {
-      publisert_dato = metaDateMatch[1].substring(0, 10)
-    }
+  }
+  if (!publisert_dato) {
+    // regjeringen.no bruker DC.Date, article:published_time eller date
+    const metaDateMatch = html.match(/<meta[^>]*(?:name="DC\.Date"|name="date"|property="article:published_time")[^>]*content="([^"]+)"/i)
+    if (metaDateMatch) publisert_dato = metaDateMatch[1].substring(0, 10)
+  }
+  if (!publisert_dato) {
+    // <span class="date">Dato: 08.04.2026</span>
+    const spanMatch = html.match(/<span[^>]*class="date"[^>]*>[^<]*?(\d{1,2}\.\d{1,2}\.\d{4})/)
+    if (spanMatch) publisert_dato = parseNorskDato(spanMatch[1])
   }
 
   // ---- Saksnummer/referanse ----

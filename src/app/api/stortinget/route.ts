@@ -104,9 +104,10 @@ function parseSak(sakXml: string): StortingetSak {
   // Komitédato: AVGFRIST (frist for avgivelse) → fallback til AVGITT (faktisk avgitt)
   const innstilling_dato = extractHendelseDato(sakXml, 'AVGFRIST')
     ?? extractHendelseDato(sakXml, 'AVGITT')
-  // Stortingsdato: PLBEHS (planlagt behandling) → BEHS (faktisk behandlet) → VOT (votering)
+  // Stortingsdato: PLBEHS (planlagt) → BEHS (faktisk) → BEH1LOV (1. behandling lovforslag) → VOT (votering)
   const behandling_dato = extractHendelseDato(sakXml, 'PLBEHS')
     ?? extractHendelseDato(sakXml, 'BEHS')
+    ?? extractHendelseDato(sakXml, 'BEH1LOV')
     ?? extractHendelseDato(sakXml, 'VOT')
 
   return {
