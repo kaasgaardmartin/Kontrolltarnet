@@ -5,6 +5,20 @@ import { hentSakDetaljer, hentHoringerForSak } from '@/app/api/stortinget/route'
 // POST /api/reimport-saker
 // Henter ferske data fra Stortinget for de 20 nyeste sakene og oppdaterer databasen
 
+export const maxDuration = 60
+
+// stortingssak_ref er lagret som full URL, f.eks. "https://www.stortinget.no/...?p=87318" → "87318"
+function extractStortingsSakId(ref: string | null): string | null {
+  if (!ref) return null
+  try {
+    const url = new URL(ref)
+    const p = url.searchParams.get('p')
+    if (p) return p
+  } catch { /* ikke en URL */ }
+  if (/^\d+$/.test(ref)) return ref
+  return null
+}
+
 export async function POST() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -39,7 +53,10 @@ export async function POST() {
     const batch = saker.slice(i, i + 3)
     const batchRes = await Promise.all(batch.map(async (sak) => {
       try {
-        const detaljer = await hentSakDetaljer(sak.stortingssak_ref!)
+        const sakId = extractStortingsSakId(sak.stortingssak_ref!)
+        if (!sakId) return { id: sak.id, tittel: sak.tittel ?? '', status: 'ikke_funnet' }
+
+        const detaljer = await hentSakDetaljer(sakId)
         if (!detaljer) return { id: sak.id, tittel: sak.tittel ?? '', status: 'ikke_funnet' }
 
         await supabase
@@ -51,7 +68,7 @@ export async function POST() {
           .eq('id', sak.id)
 
         // Oppdater høringer
-        const horinger = await hentHoringerForSak(sak.stortingssak_ref!)
+        const horinger = await hentHoringerForSak(sakId)
         if (horinger.length > 0) {
           await supabase
             .from('horinger')

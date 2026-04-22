@@ -5,6 +5,8 @@ import { skrapRegjeringenSide } from '@/lib/horing-scrape'
 // POST /api/backfill-publisert-dato
 // Scraper regjeringen.no for alle høringer som mangler publisert_dato
 
+export const maxDuration = 60
+
 export async function POST() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
