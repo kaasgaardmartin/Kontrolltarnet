@@ -121,7 +121,6 @@ export default function Toppmeny() {
     { href: '/', label: 'Stortinget' },
     { href: '/horinger', label: 'Høringer' },
     { href: '/mine-oppgaver', label: 'Mine oppgaver' },
-    { href: '/arkiv', label: 'Arkiv' },
     { href: '/admin', label: 'Komiteer' },
     ...(erOrgAdmin ? [{ href: '/admin/brukere', label: 'Brukere' }] : []),
   ]

@@ -13,6 +13,7 @@ import Sakstabell from '@/components/Sakstabell'
 import SakModal from '@/components/SakModal'
 import StortingetImport from '@/components/StortingetImport'
 import DelsakerSteg from '@/components/DelsakerSteg'
+import ArkivSakerPanel from '@/components/ArkivSakerPanel'
 
 type Filter = 'Alle' | 'Storting' | 'Departement' | 'Intern' | 'Behandles snart'
 
@@ -36,6 +37,7 @@ export default function Forsiden() {
   const [visStortingetImport, setVisStortingetImport] = useState(false)
   const [importertSak, setImportertSak] = useState<StortingetSak | null>(null)
   const [delsakerSteg, setDelsakerSteg] = useState<{ sakId: string; tittel: string } | null>(null)
+  const [fane, setFane] = useState<'aktive' | 'arkiv'>('aktive')
 
   const { invaliderSaker } = useInvaliderSakData()
 
@@ -133,12 +135,14 @@ export default function Forsiden() {
   return (
     <div>
       {/* Header area */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-[#0F1923]">Partioversikt</h1>
           <p className="text-sm text-gray-500">
-            {saker.length} aktive saker
-            {filtrerteSaker.length !== saker.length && ` (${filtrerteSaker.length} vist)`}
+            {fane === 'aktive'
+              ? `${saker.length} aktive saker${filtrerteSaker.length !== saker.length ? ` (${filtrerteSaker.length} vist)` : ''}`
+              : 'Arkiverte saker'
+            }
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -163,6 +167,26 @@ export default function Forsiden() {
         </div>
       </div>
 
+      {/* Fane-velger */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {(['aktive', 'arkiv'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFane(f)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              fane === f
+                ? 'border-[#4A9EDB] text-[#4A9EDB]'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {f === 'aktive' ? 'Aktive' : 'Arkiv'}
+          </button>
+        ))}
+      </div>
+
+      {fane === 'arkiv' && <ArkivSakerPanel />}
+
+      {fane === 'aktive' && <>
       {/* Filter bar */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex-1 relative min-w-[200px]">
@@ -285,6 +309,8 @@ export default function Forsiden() {
           </div>
         </div>
       )}
+
+      </>}
 
       {/* Modal */}
       {modalSak !== undefined && (

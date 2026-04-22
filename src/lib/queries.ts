@@ -16,6 +16,7 @@ import {
   hentAntallUlesteVarsler,
   hentHoringer,
   hentOffentligeHoringer,
+  hentArkiverteHoringer,
   hentOffentligHoring,
 } from './actions'
 
@@ -38,6 +39,7 @@ export const queryKeys = {
   sakAbonnement: (sakId: string) => ['sakAbonnement', sakId] as const,
   horinger: (sakId: string) => ['horinger', sakId] as const,
   offentligeHoringer: ['offentligeHoringer'] as const,
+  arkiverteHoringer: ['arkiverteHoringer'] as const,
   offentligHoring: (id: string) => ['offentligHoring', id] as const,
 }
 
@@ -155,11 +157,19 @@ export function useUlesteVarsler() {
   })
 }
 
-/** Alle offentlige høringer */
+/** Alle offentlige høringer (ekskl. arkiverte) */
 export function useOffentligeHoringer() {
   return useQuery({
     queryKey: queryKeys.offentligeHoringer,
     queryFn: hentOffentligeHoringer,
+  })
+}
+
+/** Arkiverte offentlige høringer */
+export function useArkiverteHoringer() {
+  return useQuery({
+    queryKey: queryKeys.arkiverteHoringer,
+    queryFn: hentArkiverteHoringer,
   })
 }
 
@@ -207,6 +217,7 @@ export function useInvaliderSakData() {
     /** Invalider offentlige høringer */
     invaliderOffentligeHoringer: (id?: string) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.offentligeHoringer })
+      queryClient.invalidateQueries({ queryKey: queryKeys.arkiverteHoringer })
       if (id) queryClient.invalidateQueries({ queryKey: queryKeys.offentligHoring(id) })
     },
   }

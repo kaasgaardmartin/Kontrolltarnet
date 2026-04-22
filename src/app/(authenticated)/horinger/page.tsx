@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useOffentligeHoringer, useOrgBrukere, useInvaliderSakData } from '@/lib/queries'
+import { useOffentligeHoringer, useArkiverteHoringer, useOrgBrukere, useInvaliderSakData } from '@/lib/queries'
+import { arkiverHoring, gjenopprettHoring } from '@/lib/actions'
 import type { OffentligHoring, OffentligHoringStatus } from '@/lib/actions'
 import OffentligHoringModal from '@/components/OffentligHoringModal'
 
-const STATUS_LABEL: Record<OffentligHoringStatus, string> = {
+const STATUS_LABEL: Record<Exclude<OffentligHoringStatus, 'arkivert'>, string> = {
   innkommet: 'Innkommet',
   til_vurdering: 'Til vurdering',
   svarer: 'Svarer',
@@ -13,7 +14,7 @@ const STATUS_LABEL: Record<OffentligHoringStatus, string> = {
   levert: 'Levert',
 }
 
-const STATUS_STIL: Record<OffentligHoringStatus, { bg: string; text: string; dot: string }> = {
+const STATUS_STIL: Record<Exclude<OffentligHoringStatus, 'arkivert'>, { bg: string; text: string; dot: string }> = {
   innkommet:    { bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-400' },
   til_vurdering:{ bg: 'bg-amber-50',  text: 'text-amber-700',  dot: 'bg-amber-400' },
   svarer:       { bg: 'bg-emerald-50',text: 'text-emerald-700',dot: 'bg-emerald-500' },
@@ -21,7 +22,7 @@ const STATUS_STIL: Record<OffentligHoringStatus, { bg: string; text: string; dot
   levert:       { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
 }
 
-const ALLE_STATUSER: OffentligHoringStatus[] = ['innkommet', 'til_vurdering', 'svarer', 'svarer_ikke', 'levert']
+const ALLE_STATUSER: Exclude<OffentligHoringStatus, 'arkivert'>[] = ['innkommet', 'til_vurdering', 'svarer', 'svarer_ikke', 'levert']
 
 // Departement-forkortelser
 const DEP_FORKORTELSE: [string, string][] = [
@@ -98,15 +99,18 @@ function SortPil({ aktiv, retning }: { aktiv: boolean; retning: 'asc' | 'desc' }
 
 export default function HoringerSide() {
   const { data: horinger = [], isLoading } = useOffentligeHoringer()
+  const { data: arkiverteHoringer = [], isLoading: lasterArkiv } = useArkiverteHoringer()
   const { data: brukere = [] } = useOrgBrukere()
   const { invaliderOffentligeHoringer } = useInvaliderSakData()
 
+  const [fane, setFane] = useState<'aktive' | 'arkiv'>('aktive')
   const [sok, setSok] = useState('')
-  const [statusFilter, setStatusFilter] = useState<OffentligHoringStatus | 'alle'>('alle')
+  const [statusFilter, setStatusFilter] = useState<Exclude<OffentligHoringStatus, 'arkivert'> | 'alle'>('alle')
   const [utvalgFilter, setUtvalgFilter] = useState('')
   const [modalHoring, setModalHoring] = useState<OffentligHoring | null | undefined>(undefined)
   const [sortBy, setSortBy] = useState<SortKolonne | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [bekreftArkiverId, setBekreftArkiverId] = useState<string | null>(null)
 
   function toggleSort(kolonne: SortKolonne) {
     if (sortBy === kolonne) {
@@ -148,30 +152,128 @@ export default function HoringerSide() {
       })
     : filtrert
 
+  async function handleArkiver(id: string) {
+    await arkiverHoring(id)
+    setBekreftArkiverId(null)
+    invaliderOffentligeHoringer()
+  }
+
+  async function handleGjenopprett(id: string) {
+    await gjenopprettHoring(id)
+    invaliderOffentligeHoringer()
+  }
+
   // Count per status for badges
   const teller = ALLE_STATUSER.reduce((acc, s) => {
     acc[s] = horinger.filter(h => h.status === s).length
     return acc
-  }, {} as Record<OffentligHoringStatus, number>)
+  }, {} as Record<Exclude<OffentligHoringStatus, 'arkivert'>, number>)
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-[#0F1923]">Høringer</h1>
           <p className="text-sm text-gray-500">
-            Offentlige høringer fra regjeringen.no
-            {filtrert.length !== horinger.length && ` — ${filtrert.length} av ${horinger.length} vist`}
+            {fane === 'aktive'
+              ? `Offentlige høringer fra regjeringen.no${filtrert.length !== horinger.length ? ` — ${filtrert.length} av ${horinger.length} vist` : ''}`
+              : `${arkiverteHoringer.length} arkiverte høringer`
+            }
           </p>
         </div>
-        <button
-          onClick={() => setModalHoring(null)}
-          className="px-4 py-2 text-sm bg-[#4A9EDB] text-white rounded-lg hover:bg-[#3a8ecb] transition-colors"
-        >
-          + Legg til høring
-        </button>
+        {fane === 'aktive' && (
+          <button
+            onClick={() => setModalHoring(null)}
+            className="px-4 py-2 text-sm bg-[#4A9EDB] text-white rounded-lg hover:bg-[#3a8ecb] transition-colors"
+          >
+            + Legg til høring
+          </button>
+        )}
       </div>
+
+      {/* Fane-velger */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {(['aktive', 'arkiv'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFane(f)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              fane === f
+                ? 'border-[#4A9EDB] text-[#4A9EDB]'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {f === 'aktive' ? 'Aktive' : `Arkiv${arkiverteHoringer.length > 0 ? ` (${arkiverteHoringer.length})` : ''}`}
+          </button>
+        ))}
+      </div>
+
+      {/* Arkiv-fane */}
+      {fane === 'arkiv' && (
+        lasterArkiv ? (
+          <div className="flex items-center justify-center py-16 text-gray-400 animate-pulse">Laster...</div>
+        ) : arkiverteHoringer.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+            <p className="text-sm text-gray-400">Ingen arkiverte høringer</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Tittel</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Dep.</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Høringsfrist</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide w-28"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {arkiverteHoringer.map((h, i) => (
+                  <tr
+                    key={h.id}
+                    className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${i === arkiverteHoringer.length - 1 ? 'border-b-0' : ''}`}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-[#0F1923] leading-snug">{h.tittel}</div>
+                      {h.regjeringen_url && (
+                        <a
+                          href={h.regjeringen_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="text-xs text-[#4A9EDB] hover:underline inline-flex items-center gap-1 mt-0.5"
+                        >
+                          regjeringen.no
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {kortDep(h.departement)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">
+                      {h.horingsfrist ? formaterDato(h.horingsfrist) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleGjenopprett(h.id)}
+                        className="text-xs text-[#4A9EDB] hover:underline"
+                      >
+                        Gjenopprett
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+
+      {fane === 'aktive' && <>
+
 
       {/* Status-kort */}
       <div className="grid grid-cols-5 gap-3 mb-6">
@@ -288,7 +390,7 @@ export default function HoringerSide() {
             </thead>
             <tbody>
               {sortert.map((h, i) => {
-                const stil = STATUS_STIL[h.status]
+                const stil = STATUS_STIL[h.status as Exclude<OffentligHoringStatus, 'arkivert'>]
                 return (
                   <tr
                     key={h.id}
@@ -351,10 +453,27 @@ export default function HoringerSide() {
                       }
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${stil.bg} ${stil.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${stil.dot}`} />
-                        {STATUS_LABEL[h.status]}
-                      </span>
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${stil.bg} ${stil.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${stil.dot}`} />
+                          {STATUS_LABEL[h.status as Exclude<OffentligHoringStatus, 'arkivert'>]}
+                        </span>
+                        {bekreftArkiverId === h.id ? (
+                          <span className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                            <span className="text-xs text-gray-500">Arkivere?</span>
+                            <button onClick={() => handleArkiver(h.id)} className="text-xs text-white bg-gray-700 hover:bg-gray-900 px-2 py-0.5 rounded transition-colors">Ja</button>
+                            <button onClick={() => setBekreftArkiverId(null)} className="text-xs text-gray-400 hover:text-gray-600">Nei</button>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={e => { e.stopPropagation(); setBekreftArkiverId(h.id) }}
+                            className="text-xs text-gray-300 hover:text-gray-500 shrink-0 transition-colors"
+                            title="Arkiver høring"
+                          >
+                            Arkiver
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -376,6 +495,7 @@ export default function HoringerSide() {
           onLukk={() => setModalHoring(undefined)}
         />
       )}
+      </>}
     </div>
   )
 }

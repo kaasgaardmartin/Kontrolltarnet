@@ -51,6 +51,7 @@ const STATUS_LABEL: Record<OffentligHoringStatus, string> = {
   svarer: 'Svarer',
   svarer_ikke: 'Svarer ikke',
   levert: 'Levert',
+  arkivert: 'Arkivert',
 }
 
 const STATUS_STEG: OffentligHoringStatus[] = ['innkommet', 'til_vurdering', 'svarer', 'levert']

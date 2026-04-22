@@ -1449,7 +1449,7 @@ export async function hentSakAbonnement(sakId: string): Promise<boolean> {
 // Offentlige høringer (regjeringen.no)
 // ============================================================
 
-export type OffentligHoringStatus = 'innkommet' | 'til_vurdering' | 'svarer' | 'svarer_ikke' | 'levert'
+export type OffentligHoringStatus = 'innkommet' | 'til_vurdering' | 'svarer' | 'svarer_ikke' | 'levert' | 'arkivert'
 export type HoringType = 'skriftlig' | 'muntlig' | 'begge'
 
 export interface OffentligHoringVedlegg {
@@ -1497,9 +1497,61 @@ export async function hentOffentligeHoringer(): Promise<OffentligHoring[]> {
       opprettet_av_bruker:brukere!opprettet_av(navn)
     `)
     .eq('organisasjon_id', bruker.organisasjon_id)
+    .neq('status', 'arkivert')
     .order('created_at', { ascending: false })
 
   return (data ?? []) as OffentligHoring[]
+}
+
+export async function hentArkiverteHoringer(): Promise<OffentligHoring[]> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const { data } = await supabase
+    .from('offentlige_horinger')
+    .select(`
+      *,
+      ansvarlig:brukere!ansvarlig_id(navn),
+      opprettet_av_bruker:brukere!opprettet_av(navn)
+    `)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .eq('status', 'arkivert')
+    .order('updated_at', { ascending: false })
+
+  return (data ?? []) as OffentligHoring[]
+}
+
+export async function arkiverHoring(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { error } = await supabase
+    .from('offentlige_horinger')
+    .update({ status: 'arkivert' })
+    .eq('id', id)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function gjenopprettHoring(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { error } = await supabase
+    .from('offentlige_horinger')
+    .update({ status: 'innkommet' })
+    .eq('id', id)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
 }
 
 export async function hentOffentligHoring(id: string): Promise<OffentligHoring | null> {
