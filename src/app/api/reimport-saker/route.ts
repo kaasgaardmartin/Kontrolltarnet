@@ -13,7 +13,7 @@ export async function POST() {
   const { data: bruker } = await supabase
     .from('brukere')
     .select('organisasjon_id, rolle')
-    .eq('auth_id', user.id)
+    .eq('id', user.id)
     .single()
 
   if (!bruker) return NextResponse.json({ error: 'Bruker ikke funnet' }, { status: 404 })
