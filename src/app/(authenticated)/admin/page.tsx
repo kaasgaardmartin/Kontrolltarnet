@@ -56,6 +56,24 @@ export default function AdminPage() {
     }
   }
 
+  // Backfill publisert_dato-state
+  const [backfillStatus, setBackfillStatus] = useState<'idle' | 'kjorer' | 'ferdig' | 'feil'>('idle')
+  const [backfillResultat, setBackfillResultat] = useState<{ antall: number; oppdatert: number; ingen_dato: number; feil: number } | null>(null)
+
+  async function handleBackfill() {
+    setBackfillStatus('kjorer')
+    setBackfillResultat(null)
+    try {
+      const res = await fetch('/api/backfill-publisert-dato', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setBackfillResultat({ antall: data.antall, oppdatert: data.oppdatert, ingen_dato: data.ingen_dato, feil: data.feil })
+      setBackfillStatus('ferdig')
+    } catch {
+      setBackfillStatus('feil')
+    }
+  }
+
   // Bruk lokalt redigerte mandater hvis de finnes, ellers data fra server
   const visStortingsmandater = stortingsmandater ?? toRecord(mandaterRaw)
 
@@ -142,6 +160,44 @@ export default function AdminPage() {
             className="shrink-0 px-4 py-2 text-sm bg-[#0F1923] text-white rounded-lg hover:bg-[#1a2836] transition-colors disabled:opacity-50"
           >
             {reimportStatus === 'kjorer' ? 'Kjører...' : 'Last inn på nytt'}
+          </button>
+        </div>
+      </div>
+
+      {/* Backfill publisert_dato */}
+      <div>
+        <h2 className="text-xl font-bold text-[#0F1923] mb-1">Fyll inn manglende sendedatoer</h2>
+        <p className="text-sm text-gray-500 mb-4">Scraper regjeringen.no for alle høringer som mangler «Sendt»-dato</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center justify-between gap-4">
+          <div className="text-sm text-gray-600">
+            {backfillStatus === 'idle' && 'Går gjennom høringer med URL men uten sendedato og fyller inn automatisk.'}
+            {backfillStatus === 'kjorer' && (
+              <span className="inline-flex items-center gap-2 text-[#4A9EDB]">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Scraper regjeringen.no...
+              </span>
+            )}
+            {backfillStatus === 'ferdig' && backfillResultat && (
+              <span className="text-emerald-600">
+                {backfillResultat.antall === 0
+                  ? 'Alle høringer har allerede en sendedato'
+                  : `✓ ${backfillResultat.oppdatert} av ${backfillResultat.antall} oppdatert`
+                }
+                {backfillResultat.ingen_dato > 0 && <span className="text-gray-400 ml-2">({backfillResultat.ingen_dato} uten synlig dato på siden)</span>}
+                {backfillResultat.feil > 0 && <span className="text-amber-500 ml-2">({backfillResultat.feil} feil)</span>}
+              </span>
+            )}
+            {backfillStatus === 'feil' && <span className="text-red-500">Noe gikk galt — prøv igjen</span>}
+          </div>
+          <button
+            onClick={handleBackfill}
+            disabled={backfillStatus === 'kjorer'}
+            className="shrink-0 px-4 py-2 text-sm bg-[#0F1923] text-white rounded-lg hover:bg-[#1a2836] transition-colors disabled:opacity-50"
+          >
+            {backfillStatus === 'kjorer' ? 'Kjører...' : 'Fyll inn datoer'}
           </button>
         </div>
       </div>
