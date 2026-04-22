@@ -118,7 +118,7 @@ export default function Toppmeny() {
   const erOrgAdmin = bruker?.rolle === 'org-admin'
 
   const navItems = [
-    { href: '/', label: 'Oversikt' },
+    { href: '/', label: 'Stortinget' },
     { href: '/horinger', label: 'Høringer' },
     { href: '/mine-oppgaver', label: 'Mine oppgaver' },
     { href: '/arkiv', label: 'Arkiv' },
