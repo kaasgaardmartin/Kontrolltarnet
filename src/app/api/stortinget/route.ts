@@ -127,7 +127,7 @@ function parseSak(sakXml: string): StortingetSak {
 }
 
 // Hent detaljer for én enkelt sak (inkl. saksgang med datoer)
-async function hentSakDetaljer(sakId: string): Promise<StortingetSak | null> {
+export async function hentSakDetaljer(sakId: string): Promise<StortingetSak | null> {
   const url = `https://data.stortinget.no/eksport/sak?sakid=${encodeURIComponent(sakId)}`
   const response = await fetch(url)
   if (!response.ok) return null

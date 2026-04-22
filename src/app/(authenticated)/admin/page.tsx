@@ -38,6 +38,24 @@ export default function AdminPage() {
   const [lagrerStorting, setLagrerStorting] = useState(false)
   const [bekreftSlett, setBekreftSlett] = useState<string | null>(null)
 
+  // Reimport-state
+  const [reimportStatus, setReimportStatus] = useState<'idle' | 'kjorer' | 'ferdig' | 'feil'>('idle')
+  const [reimportResultat, setReimportResultat] = useState<{ antall: number; oppdatert: number; feil: number } | null>(null)
+
+  async function handleReimport() {
+    setReimportStatus('kjorer')
+    setReimportResultat(null)
+    try {
+      const res = await fetch('/api/reimport-saker', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setReimportResultat({ antall: data.antall, oppdatert: data.oppdatert, feil: data.feil })
+      setReimportStatus('ferdig')
+    } catch {
+      setReimportStatus('feil')
+    }
+  }
+
   // Bruk lokalt redigerte mandater hvis de finnes, ellers data fra server
   const visStortingsmandater = stortingsmandater ?? toRecord(mandaterRaw)
 
@@ -93,6 +111,41 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-8">
+
+      {/* Reimport saker */}
+      <div>
+        <h2 className="text-xl font-bold text-[#0F1923] mb-1">Synkroniser saker</h2>
+        <p className="text-sm text-gray-500 mb-4">Henter ferske datoer og høringer fra Stortinget for de 20 nyeste sakene</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center justify-between gap-4">
+          <div className="text-sm text-gray-600">
+            {reimportStatus === 'idle' && 'Oppdaterer komitédatoer, stortingsdatoer og høringer.'}
+            {reimportStatus === 'kjorer' && (
+              <span className="inline-flex items-center gap-2 text-[#4A9EDB]">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Henter data fra Stortinget...
+              </span>
+            )}
+            {reimportStatus === 'ferdig' && reimportResultat && (
+              <span className="text-emerald-600">
+                ✓ {reimportResultat.oppdatert} av {reimportResultat.antall} saker oppdatert
+                {reimportResultat.feil > 0 && <span className="text-amber-500 ml-2">({reimportResultat.feil} feil)</span>}
+              </span>
+            )}
+            {reimportStatus === 'feil' && <span className="text-red-500">Noe gikk galt — prøv igjen</span>}
+          </div>
+          <button
+            onClick={handleReimport}
+            disabled={reimportStatus === 'kjorer'}
+            className="shrink-0 px-4 py-2 text-sm bg-[#0F1923] text-white rounded-lg hover:bg-[#1a2836] transition-colors disabled:opacity-50"
+          >
+            {reimportStatus === 'kjorer' ? 'Kjører...' : 'Last inn på nytt'}
+          </button>
+        </div>
+      </div>
+
       {/* Stortingsmandater */}
       <div>
         <h1 className="text-xl font-bold text-[#0F1923] mb-1">Stortingsmandater</h1>
