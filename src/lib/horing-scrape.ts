@@ -268,25 +268,45 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
   const instanser: string[] = []
   const instansStart = html.indexOf('id="horingsinstanser"')
   if (instansStart !== -1) {
-    const nesteFactbox = html.indexOf('<div class="factbox">', instansStart + 20)
-    const instansHtml = nesteFactbox !== -1
-      ? html.substring(instansStart, nesteFactbox)
-      : html.substring(instansStart, instansStart + 20000)
+    // Finn den tidligste av alle mulige stop-punkter for å unngå å plukke opp sidefooter
+    const stopKandidater = [
+      html.indexOf('<div class="factbox">', instansStart + 20),
+      html.indexOf('</article>', instansStart + 20),
+      html.indexOf('<footer', instansStart + 20),
+      html.indexOf('id="article-footer"', instansStart + 20),
+      html.indexOf('class="article__footer"', instansStart + 20),
+    ].filter(i => i !== -1)
+    const stopPos = stopKandidater.length > 0
+      ? Math.min(...stopKandidater)
+      : instansStart + 15000
+    const instansHtml = html.substring(instansStart, stopPos)
+
+    // Hjelpefunksjon: hent tekst fra en HTML-blokk
+    // Hvis blokken inneholder <a>-tagger bruker vi dem individuelt (hvert <a> = én org)
+    // Ellers faller vi tilbake på <br>-splitting
+    function hentNavnFraBlokk(blokk: string): string[] {
+      const anchors = [...blokk.matchAll(/<a[^>]*>([\s\S]*?)<\/a>/gi)]
+      if (anchors.length > 0) {
+        return anchors
+          .map(([, t]) => renskTekst(t.replace(/<[^>]+>/g, '')))
+          .filter(n => n.length > 2 && !erInstansJunk(n))
+      }
+      // Ingen <a>: prøv <br>-splitting
+      const medLF = blokk.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
+      return medLF.split('\n').map(l => renskTekst(l)).filter(l => l.length > 2 && !erInstansJunk(l))
+    }
+
     // Prøv <p>-tagger (nytt format)
     const pMatches = [...instansHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
     for (const [, p] of pMatches) {
-      // Erstatt <br> med linjeskift FØR vi stripper tagger, så navn ikke klumpes
-      const medLinjeskift = p.replace(/<br\s*\/?>/gi, '\n')
-      const stripped = medLinjeskift.replace(/<[^>]+>/g, '')
-      const linjer = stripped.split('\n').map(l => renskTekst(l)).filter(l => l && l.length > 2 && !erInstansJunk(l))
-      instanser.push(...linjer)
+      instanser.push(...hentNavnFraBlokk(p))
     }
+
     // Fallback: <li>-tagger (gammelt format)
     if (instanser.length === 0) {
       const liMatches = [...instansHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
       for (const [, li] of liMatches) {
-        const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
-        if (navn && !erInstansJunk(navn)) instanser.push(navn)
+        instanser.push(...hentNavnFraBlokk(li))
       }
     }
   } else {
@@ -296,7 +316,7 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
       const liMatches = [...instansBlock[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
       for (const [, li] of liMatches) {
         const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
-        if (navn) instanser.push(navn)
+        if (navn && !erInstansJunk(navn)) instanser.push(navn)
       }
     }
   }
