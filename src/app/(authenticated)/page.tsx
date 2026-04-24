@@ -137,7 +137,7 @@ export default function Forsiden() {
       {/* Header area */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-[#0F1923]">Partioversikt</h1>
+          <h1 className="text-xl font-bold text-[#0F1923]">Stortinget</h1>
           <p className="text-sm text-gray-500">
             {fane === 'aktive'
               ? `${saker.length} aktive saker${filtrerteSaker.length !== saker.length ? ` (${filtrerteSaker.length} vist)` : ''}`
