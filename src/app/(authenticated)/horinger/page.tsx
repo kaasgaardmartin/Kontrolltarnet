@@ -8,10 +8,10 @@ import OffentligHoringModal from '@/components/OffentligHoringModal'
 
 const STATUS_LABEL: Record<Exclude<OffentligHoringStatus, 'arkivert'>, string> = {
   innkommet: 'Innkommet',
-  til_vurdering: 'Til vurdering',
+  til_vurdering: 'Sendt til utvalg',
   svarer: 'Svarer',
   svarer_ikke: 'Svarer ikke',
-  levert: 'Levert',
+  levert: 'Svart',
 }
 
 const STATUS_STIL: Record<Exclude<OffentligHoringStatus, 'arkivert'>, { bg: string; text: string; dot: string }> = {

@@ -47,14 +47,12 @@ export const UTVALG_LISTE = [
 
 const STATUS_LABEL: Record<OffentligHoringStatus, string> = {
   innkommet: 'Innkommet',
-  til_vurdering: 'Til vurdering',
+  til_vurdering: 'Sendt til utvalg',
   svarer: 'Svarer',
   svarer_ikke: 'Svarer ikke',
-  levert: 'Levert',
+  levert: 'Svart',
   arkivert: 'Arkivert',
 }
-
-const STATUS_STEG: OffentligHoringStatus[] = ['innkommet', 'til_vurdering', 'svarer', 'levert']
 
 // ---- Props ----
 
@@ -459,25 +457,93 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
 
           {fane === 'intern' && (
             <>
-              {/* Status-steg */}
+              {/* Workflow-stepper */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
                   Status
                 </label>
-                <div className="flex gap-2 flex-wrap">
-                  {(['innkommet', 'til_vurdering', 'svarer', 'svarer_ikke', 'levert'] as OffentligHoringStatus[]).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setStatus(s)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        status === s
-                          ? 'bg-[#0F1923] text-white border-[#0F1923]'
-                          : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
-                      }`}
-                    >
-                      {STATUS_LABEL[s]}
-                    </button>
+
+                {/* Sekretariat-rekke */}
+                <div className="mb-1">
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sekretariat</span>
+                </div>
+                <div className="flex items-center gap-1 mb-3 flex-wrap">
+                  {(['innkommet', 'til_vurdering'] as OffentligHoringStatus[]).map((s, idx) => (
+                    <div key={s} className="flex items-center gap-1">
+                      {idx > 0 && (
+                        <svg className="w-3.5 h-3.5 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      )}
+                      <button
+                        onClick={() => setStatus(s)}
+                        className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                          status === s
+                            ? 'bg-[#0F1923] text-white border-[#0F1923] font-medium'
+                            : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
+                        }`}
+                      >
+                        {STATUS_LABEL[s]}
+                      </button>
+                    </div>
                   ))}
+                </div>
+
+                {/* Intern frist-advarsel */}
+                {status === 'til_vurdering' && !internFrist && (
+                  <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    Husk å sette intern frist for lovutvalget
+                  </div>
+                )}
+
+                {/* Skillelinje */}
+                <div className="border-t border-gray-100 my-3" />
+
+                {/* Lovutvalg-rekke */}
+                <div className="mb-1">
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Lovutvalget</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Hoved-flyt: svarer → svart */}
+                  <div className="flex items-center gap-1">
+                    {(['svarer', 'levert'] as OffentligHoringStatus[]).map((s, idx) => (
+                      <div key={s} className="flex items-center gap-1">
+                        {idx > 0 && (
+                          <svg className="w-3.5 h-3.5 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        )}
+                        <button
+                          onClick={() => setStatus(s)}
+                          className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                            status === s
+                              ? 'bg-[#0F1923] text-white border-[#0F1923] font-medium'
+                              : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
+                          }`}
+                        >
+                          {STATUS_LABEL[s]}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Separator */}
+                  <span className="text-gray-300 text-xs">eller</span>
+
+                  {/* Svarer ikke */}
+                  <button
+                    onClick={() => setStatus('svarer_ikke')}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                      status === 'svarer_ikke'
+                        ? 'bg-gray-700 text-white border-gray-700 font-medium'
+                        : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
+                    }`}
+                  >
+                    {STATUS_LABEL['svarer_ikke']}
+                  </button>
                 </div>
               </div>
 
