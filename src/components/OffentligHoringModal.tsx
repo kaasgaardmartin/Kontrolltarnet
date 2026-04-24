@@ -123,6 +123,8 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   const [ansvarligId, setAnsvarligId] = useState(horing?.ansvarlig_id || '')
   const [internFrist, setInternFrist] = useState(horing?.intern_frist || '')
   const [internNotat, setInternNotat] = useState(horing?.intern_notat || '')
+  const [horingsbrevEdocs, setHoringsbrevEdocs] = useState(horing?.horingsbrev_edocs || '')
+  const [horingssvarvEdocs, setHoringssvarvEdocs] = useState(horing?.horingssvar_edocs || '')
 
   // UI-state
   const [lagrer, setLagrer] = useState(false)
@@ -201,6 +203,8 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
       utvalg,
       hoved_utvalg: utvalg.length > 1 ? (hovedUtvalg || null) : null,
       ansvarlig_id: ansvarligId || null,
+      horingsbrev_edocs: horingsbrevEdocs.trim() || null,
+      horingssvar_edocs: horingssvarvEdocs.trim() || null,
       intern_frist: internFrist || null,
       intern_notat: internNotat || null,
     }
@@ -295,6 +299,16 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                   </svg>
                   regjeringen.no
                 </a>
+              )}
+              {horingsbrevEdocs && (
+                <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-0.5 rounded" title="Høringsbrev eDocs">
+                  HB {horingsbrevEdocs}
+                </span>
+              )}
+              {horingssvarvEdocs && (
+                <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-0.5 rounded" title="Høringssvar eDocs">
+                  HS {horingssvarvEdocs}
+                </span>
               )}
             </div>
           </div>
@@ -717,6 +731,38 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                     value={internFrist}
                     onChange={e => setInternFrist(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* eDocs-referanser */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    Høringsbrev eDocs
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={horingsbrevEdocs}
+                    onChange={e => setHoringsbrevEdocs(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    maxLength={6}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent font-mono tracking-widest"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    Høringssvar eDocs
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={horingssvarvEdocs}
+                    onChange={e => setHoringssvarvEdocs(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    maxLength={6}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent font-mono tracking-widest"
                   />
                 </div>
               </div>
