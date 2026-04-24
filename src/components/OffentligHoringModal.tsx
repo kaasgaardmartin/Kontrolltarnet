@@ -129,7 +129,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   const [feil, setFeil] = useState('')
   const [sletter, setSletter] = useState(false)
   const [bekreftSlett, setBekreftSlett] = useState(false)
-  const [fane, setFane] = useState<'info' | 'intern'>('info')
+  const [fane, setFane] = useState<'info' | 'intern'>(erNy ? 'info' : 'intern')
   const [utvalgSok, setUtvalgSok] = useState('')
 
   // Auto-hent fra URL
@@ -254,6 +254,51 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
             </button>
           ))}
         </div>
+
+        {/* Høring-sammendrag — alltid synlig for eksisterende høringer */}
+        {!erNy && (
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 shrink-0">
+            <p className="text-sm font-semibold text-[#0F1923] leading-snug line-clamp-2 mb-1.5">{tittel}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {departement && (
+                <span className="text-xs font-medium text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">
+                  {departement}
+                </span>
+              )}
+              {horingsfrist && (() => {
+                const d = new Date(horingsfrist)
+                const dagerTil = Math.floor((d.getTime() - Date.now()) / 86400000)
+                const passert = dagerTil < 0
+                const snart = !passert && dagerTil <= 7
+                return (
+                  <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                    passert ? 'bg-gray-100 text-gray-400' : snart ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'
+                  }`}>
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                    </svg>
+                    Frist {d.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })}
+                    {!passert && dagerTil <= 14 && ` (${dagerTil}d)`}
+                  </span>
+                )
+              })()}
+              {url && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="text-xs text-[#4A9EDB] hover:underline inline-flex items-center gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                  regjeringen.no
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
