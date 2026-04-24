@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/hent-offentlige-horinger",
-      "schedule": "0 8,12 * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }
