@@ -119,6 +119,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   // Intern behandling
   const [status, setStatus] = useState<OffentligHoringStatus>(horing?.status || 'innkommet')
   const [utvalg, setUtvalg] = useState<string[]>(horing?.utvalg || [])
+  const [hovedUtvalg, setHovedUtvalg] = useState<string | null>(horing?.hoved_utvalg || null)
   const [ansvarligId, setAnsvarligId] = useState(horing?.ansvarlig_id || '')
   const [internFrist, setInternFrist] = useState(horing?.intern_frist || '')
   const [internNotat, setInternNotat] = useState(horing?.intern_notat || '')
@@ -169,7 +170,16 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   }
 
   function toggleUtvalg(u: string) {
-    setUtvalg(prev => prev.includes(u) ? prev.filter(x => x !== u) : [...prev, u])
+    setUtvalg(prev => {
+      const neste = prev.includes(u) ? prev.filter(x => x !== u) : [...prev, u]
+      // Fjern hoved_utvalg hvis det aktuelle utvalget fjernes
+      if (!neste.includes(u) && hovedUtvalg === u) setHovedUtvalg(null)
+      return neste
+    })
+  }
+
+  function toggleHovedUtvalg(u: string) {
+    setHovedUtvalg(prev => prev === u ? null : u)
   }
 
   async function handleLagre() {
@@ -189,6 +199,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
       vedlegg,
       status,
       utvalg,
+      hoved_utvalg: utvalg.length > 1 ? (hovedUtvalg || null) : null,
       ansvarlig_id: ansvarligId || null,
       intern_frist: internFrist || null,
       intern_notat: internNotat || null,
@@ -549,29 +560,55 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
 
               {/* Tildel utvalg */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                  Tildelt utvalg {utvalg.length > 0 && <span className="text-[#4A9EDB] font-normal">({utvalg.length} valgt)</span>}
-                </label>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Tildelt utvalg {utvalg.length > 0 && <span className="text-[#4A9EDB] font-normal">({utvalg.length} valgt)</span>}
+                  </label>
+                  {utvalg.length > 1 && (
+                    <span className="text-[10px] text-gray-400">Klikk ★ for å sette lead</span>
+                  )}
+                </div>
 
                 {/* Valgte utvalg */}
                 {utvalg.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {utvalg.map(u => (
-                      <span
-                        key={u}
-                        className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-full"
-                      >
-                        {u}
-                        <button
-                          onClick={() => toggleUtvalg(u)}
-                          className="hover:text-indigo-900 transition-colors ml-0.5"
+                    {utvalg.map(u => {
+                      const erLead = hovedUtvalg === u
+                      return (
+                        <span
+                          key={u}
+                          className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-colors ${
+                            erLead
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
                         >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </span>
-                    ))}
+                          {utvalg.length > 1 && (
+                            <button
+                              onClick={() => toggleHovedUtvalg(u)}
+                              title={erLead ? 'Fjern som lead' : 'Sett som lead'}
+                              className={`transition-colors ${erLead ? 'text-yellow-300 hover:text-yellow-100' : 'text-indigo-300 hover:text-indigo-600'}`}
+                            >
+                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill={erLead ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+                              </svg>
+                            </button>
+                          )}
+                          {u}
+                          {erLead && (
+                            <span className="text-[10px] font-semibold text-yellow-200 ml-0.5">Lead</span>
+                          )}
+                          <button
+                            onClick={() => toggleUtvalg(u)}
+                            className={`transition-colors ml-0.5 ${erLead ? 'hover:text-indigo-200' : 'hover:text-indigo-900'}`}
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </span>
+                      )
+                    })}
                   </div>
                 )}
 

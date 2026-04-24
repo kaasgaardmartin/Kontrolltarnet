@@ -442,9 +442,26 @@ export default function HoringerSide() {
                     <td className="px-4 py-3 hidden lg:table-cell">
                       {h.utvalg.length > 0
                         ? <div className="flex flex-wrap gap-1">
-                            {h.utvalg.map(u => (
-                              <span key={u} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">{u}</span>
-                            ))}
+                            {h.utvalg.map(u => {
+                              const erLead = h.utvalg.length > 1 && h.hoved_utvalg === u
+                              return (
+                                <span
+                                  key={u}
+                                  className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+                                    erLead
+                                      ? 'bg-indigo-600 text-white font-medium'
+                                      : 'bg-indigo-50 text-indigo-700'
+                                  }`}
+                                >
+                                  {erLead && (
+                                    <svg className="w-2.5 h-2.5 text-yellow-300 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+                                    </svg>
+                                  )}
+                                  {u}
+                                </span>
+                              )
+                            })}
                           </div>
                         : <span className="text-gray-300">—</span>
                       }

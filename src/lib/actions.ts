@@ -1473,6 +1473,7 @@ export interface OffentligHoring {
   vedlegg: OffentligHoringVedlegg[]
   status: OffentligHoringStatus
   utvalg: string[]            // kan tildeles flere utvalg
+  hoved_utvalg: string | null // lead-utvalg ved flere utvalg
   ansvarlig_id: string | null
   intern_frist: string | null
   intern_notat: string | null
@@ -1586,6 +1587,7 @@ export async function opprettOffentligHoring(input: {
   vedlegg?: OffentligHoringVedlegg[]
   status?: OffentligHoringStatus
   utvalg?: string[]
+  hoved_utvalg?: string | null
   ansvarlig_id?: string | null
   intern_frist?: string | null
   intern_notat?: string | null
@@ -1614,6 +1616,7 @@ export async function opprettOffentligHoring(input: {
       vedlegg: input.vedlegg || [],
       status: input.status || 'innkommet',
       utvalg: input.utvalg || [],
+      hoved_utvalg: input.hoved_utvalg || null,
       ansvarlig_id: input.ansvarlig_id || null,
       intern_frist: input.intern_frist || null,
       intern_notat: input.intern_notat || null,
@@ -1641,6 +1644,7 @@ export async function oppdaterOffentligHoring(
     vedlegg: OffentligHoringVedlegg[]
     status: OffentligHoringStatus
     utvalg: string[]
+    hoved_utvalg: string | null
     ansvarlig_id: string | null
     intern_frist: string | null
     intern_notat: string | null
