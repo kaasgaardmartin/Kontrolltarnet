@@ -74,6 +74,28 @@ function formatDato(d: string | null): string {
   } catch { return d }
 }
 
+// Filtrer bort footer-søppel fra eldre imports
+const INSTANS_JUNK = [
+  /^ansvarlig for/i,
+  /^telefon:/i,
+  /^e-?post:/i,
+  /^organisasjonsnummer:/i,
+  /^personvernerklæring/i,
+  /^til toppen/i,
+  /^postadresse:/i,
+  /^besøksadresse:/i,
+  /^kontakt oss/i,
+  /^\d[\d\s]*$/, // bare tall
+]
+
+function renskInstanser(instanser: string[]): string[] {
+  return instanser.filter(i => !INSTANS_JUNK.some(r => r.test(i.trim())))
+}
+
+function erAdvokatforening(inst: string): boolean {
+  return /advokatforening/i.test(inst)
+}
+
 // ---- Komponent ----
 
 export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk }: Props) {
@@ -397,20 +419,41 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
               )}
 
               {/* Høringsinstanser */}
-              {horingInstanser.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                    Høringsinstanser ({horingInstanser.length})
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    {horingInstanser.map(inst => (
-                      <span key={inst} className="text-xs bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-600">
-                        {inst}
-                      </span>
-                    ))}
+              {horingInstanser.length > 0 && (() => {
+                const rensket = renskInstanser(horingInstanser)
+                const harAdvokatforening = rensket.some(erAdvokatforening)
+                return (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Høringsinstanser ({rensket.length})
+                      </label>
+                      {harAdvokatforening && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                          </svg>
+                          Mottaker
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                      {rensket.map(inst => (
+                        <span
+                          key={inst}
+                          className={`text-xs px-2 py-0.5 rounded-full border ${
+                            erAdvokatforening(inst)
+                              ? 'bg-amber-50 border-amber-300 text-amber-800 font-medium'
+                              : 'bg-white border-gray-200 text-gray-600'
+                          }`}
+                        >
+                          {inst}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </>
           )}
 

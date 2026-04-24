@@ -78,6 +78,23 @@ export function renskTekst(str: string): string {
   return dekodHtmlEntiteter(str).replace(/\s+/g, ' ').trim()
 }
 
+// Filtrer bort footer-søppel som dukker opp i høringsinstans-blokken
+function erInstansJunk(tekst: string): boolean {
+  const junkMønstre = [
+    /^ansvarlig for/i,
+    /^telefon:/i,
+    /^e-?post:/i,
+    /^organisasjonsnummer:/i,
+    /^personvernerklæring/i,
+    /^til toppen/i,
+    /^postadresse:/i,
+    /^besøksadresse:/i,
+    /^kontakt oss/i,
+    /^\d[\d\s]*$/, // bare tall/mellomrom (org-nummer, tlf)
+  ]
+  return junkMønstre.some(r => r.test(tekst.trim()))
+}
+
 // Henter og parser en regjeringen.no høring-side
 export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeResultat> {
   const resp = await fetch(url, {
@@ -258,15 +275,18 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
     // Prøv <p>-tagger (nytt format)
     const pMatches = [...instansHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
     for (const [, p] of pMatches) {
-      const navn = renskTekst(p.replace(/<[^>]+>/g, ''))
-      if (navn && navn.length > 2) instanser.push(navn)
+      // Erstatt <br> med linjeskift FØR vi stripper tagger, så navn ikke klumpes
+      const medLinjeskift = p.replace(/<br\s*\/?>/gi, '\n')
+      const stripped = medLinjeskift.replace(/<[^>]+>/g, '')
+      const linjer = stripped.split('\n').map(l => renskTekst(l)).filter(l => l && l.length > 2 && !erInstansJunk(l))
+      instanser.push(...linjer)
     }
     // Fallback: <li>-tagger (gammelt format)
     if (instanser.length === 0) {
       const liMatches = [...instansHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
       for (const [, li] of liMatches) {
         const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
-        if (navn) instanser.push(navn)
+        if (navn && !erInstansJunk(navn)) instanser.push(navn)
       }
     }
   } else {

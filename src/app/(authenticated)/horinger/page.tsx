@@ -84,6 +84,11 @@ function FristChip({ dato }: { dato: string }) {
   )
 }
 
+function erMottaker(instanser: string[] | null | undefined): boolean {
+  if (!instanser) return false
+  return instanser.some(i => /advokatforening/i.test(i))
+}
+
 function SortPil({ aktiv, retning }: { aktiv: boolean; retning: 'asc' | 'desc' }) {
   return (
     <span className={`ml-1 inline-flex flex-col gap-px ${aktiv ? 'text-[#4A9EDB]' : 'text-gray-300'}`}>
@@ -398,7 +403,17 @@ export default function HoringerSide() {
                     className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${i === sortert.length - 1 ? 'border-b-0' : ''}`}
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-[#0F1923] leading-snug">{h.tittel}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-[#0F1923] leading-snug">{h.tittel}</span>
+                        {erMottaker(h.horing_instanser) && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                            </svg>
+                            Mottaker
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         {h.departement && (
                           <span className="text-xs text-gray-400 md:hidden">{kortDep(h.departement)}</span>
