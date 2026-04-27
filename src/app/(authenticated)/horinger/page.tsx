@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import * as XLSX from 'xlsx'
 import { useOffentligeHoringer, useArkiverteHoringer, useOrgBrukere, useInvaliderSakData } from '@/lib/queries'
 import { arkiverHoring, gjenopprettHoring } from '@/lib/actions'
 import type { OffentligHoring, OffentligHoringStatus } from '@/lib/actions'
@@ -168,33 +169,60 @@ export default function HoringerSide() {
     invaliderOffentligeHoringer()
   }
 
-  function eksporterCSV() {
-    const rader = sortert.map(h => [
-      h.tittel,
-      h.departement ?? '',
-      STATUS_LABEL[h.status as Exclude<OffentligHoringStatus, 'arkivert'>] ?? h.status,
-      h.publisert_dato ?? '',
-      h.horingsfrist ?? '',
-      h.intern_frist ?? '',
-      h.utvalg.join(' | '),
-      h.hoved_utvalg ?? '',
-      h.horingsbrev_edocs ?? '',
-      h.horingssvar_edocs ?? '',
-      h.regjeringen_url ?? '',
-    ])
+  function eksporterExcel() {
+    const wb = XLSX.utils.book_new()
 
-    const header = ['Tittel', 'Departement', 'Status', 'Publisert', 'Høringsfrist', 'Intern frist', 'Utvalg', 'Lead-utvalg', 'Høringsbrev eDocs', 'Høringssvar eDocs', 'URL']
-    const csvInnhold = [header, ...rader]
-      .map(rad => rad.map(celle => `"${String(celle).replace(/"/g, '""')}"`).join(';'))
-      .join('\n')
+    // Header-rad
+    const header = ['Tittel', 'Departement', 'Status', 'Publisert', 'Høringsfrist', 'Intern frist', 'Utvalg', 'Lead-utvalg', 'HB eDocs', 'HS eDocs', 'Lenke']
 
-    const blob = new Blob(['﻿' + csvInnhold], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `horinger-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    // Data-rader
+    const rader = sortert.map(h => ({
+      Tittel: h.tittel,
+      Departement: h.departement ?? '',
+      Status: STATUS_LABEL[h.status as Exclude<OffentligHoringStatus, 'arkivert'>] ?? h.status,
+      Publisert: h.publisert_dato ?? '',
+      Høringsfrist: h.horingsfrist ?? '',
+      'Intern frist': h.intern_frist ?? '',
+      Utvalg: h.utvalg.join(' | '),
+      'Lead-utvalg': h.hoved_utvalg ?? '',
+      'HB eDocs': h.horingsbrev_edocs ?? '',
+      'HS eDocs': h.horingssvar_edocs ?? '',
+      Lenke: h.regjeringen_url ?? '',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(rader, { header })
+
+    // Kolonnebredder
+    ws['!cols'] = [
+      { wch: 60 }, // Tittel
+      { wch: 14 }, // Departement
+      { wch: 16 }, // Status
+      { wch: 12 }, // Publisert
+      { wch: 14 }, // Høringsfrist
+      { wch: 13 }, // Intern frist
+      { wch: 35 }, // Utvalg
+      { wch: 25 }, // Lead-utvalg
+      { wch: 11 }, // HB eDocs
+      { wch: 11 }, // HS eDocs
+      { wch: 55 }, // Lenke
+    ]
+
+    // Frys header-rad
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 }
+
+    // Klikkbare lenker i Lenke-kolonnen (kolonne K = index 10)
+    sortert.forEach((h, i) => {
+      if (!h.regjeringen_url) return
+      const celle = XLSX.utils.encode_cell({ r: i + 1, c: 10 })
+      ws[celle] = {
+        v: 'regjeringen.no',
+        t: 's',
+        l: { Target: h.regjeringen_url },
+      }
+    })
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Høringer')
+    XLSX.writeFile(wb, `horinger-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   // Count per status for badges
@@ -220,9 +248,9 @@ export default function HoringerSide() {
           <div className="flex items-center gap-2">
             {sortert.length > 0 && (
               <button
-                onClick={eksporterCSV}
+                onClick={eksporterExcel}
                 className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
-                title="Eksporter til CSV"
+                title="Eksporter til Excel"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
