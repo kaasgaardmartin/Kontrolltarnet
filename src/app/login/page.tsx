@@ -68,20 +68,30 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#0F1923] mb-4">
             <svg
-              className="w-8 h-8 text-[#4A9EDB]"
+              className="w-9 h-9 text-[#4A9EDB]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
-              />
+              {/* Gavl / pediment */}
+              <path d="M2 10L12 3L22 10" />
+              {/* 5 søyler */}
+              <line x1="5" y1="10" x2="5" y2="18" />
+              <line x1="8.5" y1="10" x2="8.5" y2="18" />
+              <line x1="12" y1="10" x2="12" y2="18" />
+              <line x1="15.5" y1="10" x2="15.5" y2="18" />
+              <line x1="19" y1="10" x2="19" y2="18" />
+              {/* Søylebase */}
+              <line x1="3" y1="18" x2="21" y2="18" />
+              {/* Trapper */}
+              <line x1="2" y1="20" x2="22" y2="20" />
+              <line x1="1" y1="22" x2="23" y2="22" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-[#0F1923]">Kontrolltårnet</h1>
+          <h1 className="text-2xl font-bold text-[#0F1923]">Tingsyn</h1>
           <p className="text-sm text-gray-500 mt-1">Politisk saksoppfølging</p>
         </div>
 

@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Kontrolltårnet",
+  title: "Tingsyn",
   description: "Politisk saksoppfølging",
 };
 
