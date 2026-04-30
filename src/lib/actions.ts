@@ -1,57 +1,14 @@
 'use server'
 
 import { createServerSupabaseClient } from './supabase-server'
-import { sendOppgaveTildeltEpost } from './email'
+
 import type { Sak, PartiStemme, Stemme, Niva, Landing, Notat, Lenke, LenkeType, Komite, KomiteMandat, Rolle, Bruker, Stakeholder, SakStakeholder, Aktivitet, StakeholderType, Holdning, Innflytelse, AktivitetType, AktivitetStatus, Varsel, VarselType } from './types'
-import type { SupabaseClient } from '@supabase/supabase-js'
+
 
 // ============================================================
 // Input-validering hjelpefunksjoner
 // ============================================================
 
-// ============================================================
-// Asynkron e-postutsending (feiler stille, blokkerer ikke bruker)
-// ============================================================
-
-async function sendTildeltEpostAsync(
-  supabase: SupabaseClient,
-  aktivitetId: string,
-  ansvarligId: string,
-  tildeltAvNavn: string
-) {
-  try {
-    const { data: aktivitet } = await supabase
-      .from('aktiviteter')
-      .select('beskrivelse, type, frist, sak_id, saker!inner(id, tittel)')
-      .eq('id', aktivitetId)
-      .single()
-
-    if (!aktivitet) return
-
-    const { data: ansvarlig } = await supabase
-      .from('brukere')
-      .select('navn, epost')
-      .eq('id', ansvarligId)
-      .single()
-
-    if (!ansvarlig?.epost) return
-
-    const sak = aktivitet.saker as unknown as { id: string; tittel: string }
-
-    await sendOppgaveTildeltEpost({
-      tilEpost: ansvarlig.epost,
-      tilNavn: ansvarlig.navn,
-      oppgaveBeskrivelse: aktivitet.beskrivelse,
-      oppgaveType: aktivitet.type,
-      sakTittel: sak.tittel,
-      sakId: sak.id,
-      frist: aktivitet.frist,
-      tildeltAv: tildeltAvNavn,
-    })
-  } catch (err) {
-    console.error('Feil ved sending av tildelt-epost:', err)
-  }
-}
 
 const MAX_TITTEL = 300
 const MAX_BESKRIVELSE = 5000
@@ -1231,11 +1188,6 @@ export async function oppdaterAktivitetAnsvarlig(
     .eq('id', aktivitetId)
 
   if (error) return { success: false, error: error.message }
-
-  // Send e-postvarsling til den som ble tildelt (asynkront, ikke blokker)
-  if (ansvarligId && ansvarligId !== bruker.id) {
-    sendTildeltEpostAsync(supabase, aktivitetId, ansvarligId, bruker.navn)
-  }
 
   return { success: true }
 }
