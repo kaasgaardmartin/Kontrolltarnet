@@ -43,6 +43,14 @@ export const UTVALG_LISTE = [
   'Skjønns- ekspropriasjons- og vassdragsrett',
   'Strafferett og straffeprosess',
   'Velferds- og trygderett',
+  'Menneskerettighetsutvalget',
+  'Mangfoldsutvalget',
+  'Meklingsutvalget',
+  'Internadvokatutvalget',
+  'Utvalget for advokatetikk',
+  'Ekspertgruppe mot hvitvasking',
+  'Bistandsadvokatutvalget',
+  'Forsvarergruppen',
 ] as const
 
 const STATUS_LABEL: Record<OffentligHoringStatus, string> = {
@@ -125,6 +133,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   const [internNotat, setInternNotat] = useState(horing?.intern_notat || '')
   const [horingsbrevEdocs, setHoringsbrevEdocs] = useState(horing?.horingsbrev_edocs || '')
   const [horingssvarvEdocs, setHoringssvarvEdocs] = useState(horing?.horingssvar_edocs || '')
+  const [oversendelsesbrevEdocs, setOversendelsesbrevEdocs] = useState(horing?.oversendelsesbrev_edocs || '')
 
   // UI-state
   const [lagrer, setLagrer] = useState(false)
@@ -205,6 +214,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
       ansvarlig_id: ansvarligId || null,
       horingsbrev_edocs: horingsbrevEdocs.trim() || null,
       horingssvar_edocs: horingssvarvEdocs.trim() || null,
+      oversendelsesbrev_edocs: oversendelsesbrevEdocs.trim() || null,
       intern_frist: internFrist || null,
       intern_notat: internNotat || null,
     }
@@ -308,6 +318,11 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
               {horingssvarvEdocs && (
                 <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-0.5 rounded" title="Høringssvar eDocs">
                   HS {horingssvarvEdocs}
+                </span>
+              )}
+              {oversendelsesbrevEdocs && (
+                <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-0.5 rounded" title="Oversendelsesbrev eDocs">
+                  OB {oversendelsesbrevEdocs}
                 </span>
               )}
             </div>
@@ -736,7 +751,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
               </div>
 
               {/* eDocs-referanser */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
                     Høringsbrev eDocs
@@ -760,6 +775,20 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                     inputMode="numeric"
                     value={horingssvarvEdocs}
                     onChange={e => setHoringssvarvEdocs(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    maxLength={6}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent font-mono tracking-widest"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    E-post til lovutvalg eDocs
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={oversendelsesbrevEdocs}
+                    onChange={e => setOversendelsesbrevEdocs(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="123456"
                     maxLength={6}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent font-mono tracking-widest"

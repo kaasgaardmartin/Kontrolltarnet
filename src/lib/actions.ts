@@ -1479,6 +1479,7 @@ export interface OffentligHoring {
   intern_notat: string | null
   horingsbrev_edocs: string | null
   horingssvar_edocs: string | null
+  oversendelsesbrev_edocs: string | null
   opprettet_av: string | null
   created_at: string
   updated_at: string
@@ -1595,6 +1596,7 @@ export async function opprettOffentligHoring(input: {
   intern_notat?: string | null
   horingsbrev_edocs?: string | null
   horingssvar_edocs?: string | null
+  oversendelsesbrev_edocs?: string | null
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
@@ -1626,6 +1628,7 @@ export async function opprettOffentligHoring(input: {
       intern_notat: input.intern_notat || null,
       horingsbrev_edocs: input.horingsbrev_edocs || null,
       horingssvar_edocs: input.horingssvar_edocs || null,
+      oversendelsesbrev_edocs: input.oversendelsesbrev_edocs || null,
       opprettet_av: bruker.id,
     })
     .select('id')
@@ -1656,6 +1659,7 @@ export async function oppdaterOffentligHoring(
     intern_notat: string | null
     horingsbrev_edocs: string | null
     horingssvar_edocs: string | null
+    oversendelsesbrev_edocs: string | null
   }>
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()

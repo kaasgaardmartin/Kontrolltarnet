@@ -117,6 +117,8 @@ export default function HoringerSide() {
   const [sortBy, setSortBy] = useState<SortKolonne | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [bekreftArkiverId, setBekreftArkiverId] = useState<string | null>(null)
+  const [arkivererIds, setArkivererIds] = useState<Set<string>>(new Set())
+  const [arkiverFeil, setArkiverFeil] = useState<string | null>(null)
 
   function toggleSort(kolonne: SortKolonne) {
     if (sortBy === kolonne) {
@@ -159,7 +161,14 @@ export default function HoringerSide() {
     : filtrert
 
   async function handleArkiver(id: string) {
-    await arkiverHoring(id)
+    setArkivererIds(prev => new Set([...prev, id]))
+    setArkiverFeil(null)
+    const res = await arkiverHoring(id)
+    setArkivererIds(prev => { const s = new Set(prev); s.delete(id); return s })
+    if (!res.success) {
+      setArkiverFeil(res.error || 'Arkivering feilet')
+      return
+    }
     setBekreftArkiverId(null)
     invaliderOffentligeHoringer()
   }
@@ -563,9 +572,18 @@ export default function HoringerSide() {
                         </span>
                         {bekreftArkiverId === h.id ? (
                           <span className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-                            <span className="text-xs text-gray-500">Arkivere?</span>
-                            <button onClick={() => handleArkiver(h.id)} className="text-xs text-white bg-gray-700 hover:bg-gray-900 px-2 py-0.5 rounded transition-colors">Ja</button>
-                            <button onClick={() => setBekreftArkiverId(null)} className="text-xs text-gray-400 hover:text-gray-600">Nei</button>
+                            {arkiverFeil && <span className="text-xs text-red-500">{arkiverFeil}</span>}
+                            {!arkivererIds.has(h.id) && <span className="text-xs text-gray-500">Arkivere?</span>}
+                            <button
+                              onClick={() => handleArkiver(h.id)}
+                              disabled={arkivererIds.has(h.id)}
+                              className="text-xs text-white bg-gray-700 hover:bg-gray-900 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                            >
+                              {arkivererIds.has(h.id) ? '...' : 'Ja'}
+                            </button>
+                            {!arkivererIds.has(h.id) && (
+                              <button onClick={() => setBekreftArkiverId(null)} className="text-xs text-gray-400 hover:text-gray-600">Nei</button>
+                            )}
                           </span>
                         ) : (
                           <button
