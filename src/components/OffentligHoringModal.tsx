@@ -831,7 +831,8 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                         if (!horing?.id) return
                         setSenderEpost(true)
                         setEpostStatus(null)
-                        const res = await sendHoringEpostTilAnsvarlig(horing.id)
+                        // Send ansvarligId fra klient-state slik at vi ikke er avhengig av lagret DB-verdi
+                        const res = await sendHoringEpostTilAnsvarlig(horing.id, ansvarligId || undefined)
                         setSenderEpost(false)
                         if (res.success) {
                           setEpostStatus('sendt')

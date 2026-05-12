@@ -1653,23 +1653,35 @@ export async function slettOffentligHoring(id: string): Promise<{ success: boole
 // ─── Send høring til ansvarlig ──────────────────────────────────────────────
 
 export async function sendHoringEpostTilAnsvarlig(
-  horingId: string
+  horingId: string,
+  ansvarligIdOverride?: string   // sendes fra klient i tilfelle DB ikke er lagret ennå
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()
   const avsender = await hentBrukerOgOrg() as Awaited<ReturnType<typeof hentBrukerOgOrg>> & { epost: string } | null
   if (!avsender) return { success: false, error: 'Ikke innlogget' }
 
-  // Hent høringen med ansvarlig
+  // Hent høringen
   const { data: h, error: hErr } = await supabase
     .from('offentlige_horinger')
-    .select('*, ansvarlig:brukere!ansvarlig_id(navn, epost)')
+    .select('*')
     .eq('id', horingId)
     .eq('organisasjon_id', avsender.organisasjon_id)
     .single()
   if (hErr || !h) return { success: false, error: 'Høring ikke funnet' }
 
-  const ansvarlig = h.ansvarlig as { navn: string; epost: string } | null
-  if (!ansvarlig?.epost) return { success: false, error: 'Ansvarlig mangler e-postadresse' }
+  // Bruk override-id fra klient, ellers fall tilbake til det som er lagret
+  const ansvarligId = ansvarligIdOverride || h.ansvarlig_id
+  if (!ansvarligId) return { success: false, error: 'Ingen ansvarlig er satt på høringen' }
+
+  // Slå opp brukerens e-post separat (unngår join-problemer)
+  const { data: ansvarlig } = await supabase
+    .from('brukere')
+    .select('navn, epost')
+    .eq('id', ansvarligId)
+    .single()
+
+  if (!ansvarlig) return { success: false, error: 'Ansvarlig bruker ikke funnet' }
+  if (!ansvarlig.epost) return { success: false, error: 'Ansvarlig mangler e-postadresse i systemet' }
 
   const { sendHoringTilBehandlingEpost } = await import('@/lib/email')
   return sendHoringTilBehandlingEpost({
