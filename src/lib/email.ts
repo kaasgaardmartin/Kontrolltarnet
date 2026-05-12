@@ -235,6 +235,115 @@ export async function sendSakOppdateringEpost(params: {
   })
 }
 
+// ─── Høring til behandling ──────────────────────────────────────────
+
+export async function sendHoringTilBehandlingEpost(params: {
+  tilEpost: string
+  tilNavn: string
+  avsenderNavn: string
+  avsenderEpost: string
+  tittel: string
+  departement: string
+  horingsfrist: string | null
+  internFrist: string | null
+  utvalg: string[]
+  regjeringenUrl: string | null
+  vedlegg: { tittel: string; url: string; type: string }[]
+}) {
+  function fmtDato(iso: string | null) {
+    if (!iso) return '(ikke satt)'
+    return new Date(iso).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
+  const utvalgTekst = params.utvalg.length > 0
+    ? params.utvalg.join(', ')
+    : '(ikke tildelt utvalg)'
+
+  const vedleggHtml = params.vedlegg.length > 0
+    ? `<p style="margin:0 0 4px;font-size:13px;color:#374151;font-weight:600;">Vedlegg:</p>
+       <ul style="margin:0 0 16px;padding-left:20px;">
+         ${params.vedlegg.map(v =>
+           `<li style="font-size:13px;color:#374151;margin-bottom:4px;">
+              <a href="${v.url}" style="color:#4A9EDB;">${v.tittel}</a>
+            </li>`
+         ).join('')}
+       </ul>`
+    : ''
+
+  const lenkeHtml = params.regjeringenUrl
+    ? `<p style="margin:0 0 16px;">
+         <a href="${params.regjeringenUrl}" style="color:#4A9EDB;font-size:13px;">
+           Se høringen på regjeringen.no →
+         </a>
+       </p>`
+    : ''
+
+  const html = baseTemplate(`
+    <p style="font-size:14px;color:#374151;margin:0 0 16px;">Hei ${params.tilNavn},</p>
+
+    <p style="font-size:14px;color:#374151;margin:0 0 16px;">
+      ${params.departement ? `<strong>${params.departement}</strong> sender` : 'Det er sendt'}
+      følgende høring med frist <strong>${fmtDato(params.horingsfrist)}</strong>:
+    </p>
+
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin-bottom:16px;">
+      <p style="font-size:15px;font-weight:700;color:#0F1923;margin:0 0 8px;">${params.tittel}</p>
+      <p style="font-size:13px;color:#6b7280;margin:0;">
+        Vi ber lovutvalget for <strong>${utvalgTekst}</strong> om å vurdere høringen
+        og eventuelt utarbeide forslag til høringsuttalelse.
+      </p>
+    </div>
+
+    <table style="border-collapse:collapse;margin-bottom:16px;">
+      <tr>
+        <td style="font-size:12px;color:#6b7280;padding:2px 12px 2px 0;white-space:nowrap;">📅 Høringsfrist</td>
+        <td style="font-size:13px;color:#0F1923;font-weight:600;">${fmtDato(params.horingsfrist)}</td>
+      </tr>
+      <tr>
+        <td style="font-size:12px;color:#6b7280;padding:2px 12px 2px 0;white-space:nowrap;">📅 Intern frist</td>
+        <td style="font-size:13px;color:#0F1923;font-weight:600;">${fmtDato(params.internFrist)}</td>
+      </tr>
+    </table>
+
+    ${lenkeHtml}
+    ${vedleggHtml}
+
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:16px;">
+      <p style="font-size:13px;color:#374151;margin:0 0 8px;">
+        <strong>Bekreftelse og fristforlengelse:</strong>
+      </p>
+      <p style="font-size:13px;color:#374151;margin:0;">
+        Bekreft til <a href="mailto:${params.avsenderEpost}" style="color:#4A9EDB;">${params.avsenderNavn}</a>
+        om lovutvalget vil sende forslag til høringsuttalelse innen fristen.
+        Meld fra snarest ved behov for fristutsettelse.
+        Dersom lovutvalget mener det ikke er behov for høringsuttalelse, bes det om en kort begrunnelse.
+      </p>
+    </div>
+
+    <details style="margin-bottom:8px;">
+      <summary style="font-size:12px;color:#6b7280;cursor:pointer;font-weight:600;padding:4px 0;">
+        Retningslinjer for utarbeidelse av høringsuttalelser
+      </summary>
+      <div style="margin-top:10px;font-size:12px;color:#6b7280;line-height:1.7;border-left:3px solid #e5e7eb;padding-left:12px;">
+        <p style="margin:0 0 6px;"><strong>Struktur:</strong></p>
+        <ol style="margin:0 0 10px;padding-left:18px;">
+          <li style="margin-bottom:4px;"><em>Innledning:</em> Standard fast innledning legges inn av sekretariatet.</li>
+          <li style="margin-bottom:4px;"><em>Sakens bakgrunn:</em> Beskriv hva høringen gjelder, publiserings- og frister, og hvilke lovutvalg som har utarbeidet uttalelsen.</li>
+          <li style="margin-bottom:4px;"><em>Kommentarer:</em> Følg departementets systematikk. Avslutt gjerne hvert punkt med et standpunkt, f.eks. «Advokatforeningen foreslår…» eller «Advokatforeningen går mot…».</li>
+          <li style="margin-bottom:4px;"><em>Oppsummering:</em> Gjenta hovedsynspunktene avslutningsvis.</li>
+        </ol>
+        <p style="margin:0 0 6px;"><strong>Språk:</strong> Bruk «Advokatforeningen mener…» eller «Etter Advokatforeningens syn…». Unngå «hevder» og «gjør gjeldende». Skriv i foreningens navn — ikke «jeg» eller «vi».</p>
+      </div>
+    </details>
+  `)
+
+  return sendEpost({
+    to: params.tilEpost,
+    subject: `Høring til behandling: ${params.tittel}`,
+    html,
+  })
+}
+
 // ─── Basisfunksjon ──────────────────────────────────────────────────
 
 async function sendEpost(params: { to: string; subject: string; html: string }) {

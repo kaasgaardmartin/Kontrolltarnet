@@ -84,7 +84,7 @@ export async function hentBrukerOgOrg() {
 
   const { data: bruker } = await supabase
     .from('brukere')
-    .select('id, organisasjon_id, rolle, navn')
+    .select('id, organisasjon_id, rolle, navn, epost')
     .eq('id', user.id)
     .single()
 
@@ -1233,14 +1233,14 @@ export async function hentKommendeAktiviteter(): Promise<(Aktivitet & { saker: {
   return (data ?? []) as (Aktivitet & { saker: { id: string; tittel: string } | null })[]
 }
 
-export async function hentOrgBrukere(): Promise<{ id: string; navn: string }[]> {
+export async function hentOrgBrukere(): Promise<{ id: string; navn: string; epost: string }[]> {
   const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return []
 
   const { data } = await supabase
     .from('brukere')
-    .select('id, navn')
+    .select('id, navn, epost')
     .eq('organisasjon_id', bruker.organisasjon_id)
     .eq('aktiv', true)
     .order('navn')
@@ -1648,4 +1648,41 @@ export async function slettOffentligHoring(id: string): Promise<{ success: boole
 
   if (error) return { success: false, error: error.message }
   return { success: true }
+}
+
+// ─── Send høring til ansvarlig ──────────────────────────────────────────────
+
+export async function sendHoringEpostTilAnsvarlig(
+  horingId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const avsender = await hentBrukerOgOrg() as Awaited<ReturnType<typeof hentBrukerOgOrg>> & { epost: string } | null
+  if (!avsender) return { success: false, error: 'Ikke innlogget' }
+
+  // Hent høringen med ansvarlig
+  const { data: h, error: hErr } = await supabase
+    .from('offentlige_horinger')
+    .select('*, ansvarlig:brukere!ansvarlig_id(navn, epost)')
+    .eq('id', horingId)
+    .eq('organisasjon_id', avsender.organisasjon_id)
+    .single()
+  if (hErr || !h) return { success: false, error: 'Høring ikke funnet' }
+
+  const ansvarlig = h.ansvarlig as { navn: string; epost: string } | null
+  if (!ansvarlig?.epost) return { success: false, error: 'Ansvarlig mangler e-postadresse' }
+
+  const { sendHoringTilBehandlingEpost } = await import('@/lib/email')
+  return sendHoringTilBehandlingEpost({
+    tilEpost: ansvarlig.epost,
+    tilNavn: ansvarlig.navn,
+    avsenderNavn: avsender.navn,
+    avsenderEpost: avsender.epost,
+    tittel: h.tittel,
+    departement: h.departement ?? '',
+    horingsfrist: h.horingsfrist,
+    internFrist: h.intern_frist,
+    utvalg: h.utvalg ?? [],
+    regjeringenUrl: h.regjeringen_url,
+    vedlegg: (h.vedlegg ?? []) as { tittel: string; url: string; type: string }[],
+  })
 }

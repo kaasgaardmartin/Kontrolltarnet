@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import type { OffentligHoring, OffentligHoringStatus, HoringType, OffentligHoringVedlegg } from '@/lib/actions'
-import { opprettOffentligHoring, oppdaterOffentligHoring, slettOffentligHoring } from '@/lib/actions'
+import { opprettOffentligHoring, oppdaterOffentligHoring, slettOffentligHoring, sendHoringEpostTilAnsvarlig } from '@/lib/actions'
 import type { HoringScrapeResultat } from '@/app/api/horing-scrape/route'
 
 interface BrukerMinimal {
   id: string
   navn: string
+  epost: string
   aktiv?: boolean
 }
 
@@ -142,6 +143,9 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   const [bekreftSlett, setBekreftSlett] = useState(false)
   const [fane, setFane] = useState<'info' | 'intern'>(erNy ? 'info' : 'intern')
   const [utvalgSok, setUtvalgSok] = useState('')
+  const [senderEpost, setSenderEpost] = useState(false)
+  const [epostStatus, setEpostStatus] = useState<'sendt' | 'feil' | null>(null)
+  const [epostFeilmelding, setEpostFeilmelding] = useState('')
 
   // Auto-hent fra URL
   async function hentFraUrl() {
@@ -809,6 +813,67 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent resize-none"
                 />
               </div>
+
+              {/* Generer e-post */}
+              {!erNy && (
+                <div className="border-t border-gray-100 pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Generer e-post</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {ansvarligId
+                          ? `Sendes til ${brukere.find(b => b.id === ansvarligId)?.navn ?? 'ansvarlig'}`
+                          : 'Sett ansvarlig for å sende e-post'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!horing?.id) return
+                        setSenderEpost(true)
+                        setEpostStatus(null)
+                        const res = await sendHoringEpostTilAnsvarlig(horing.id)
+                        setSenderEpost(false)
+                        if (res.success) {
+                          setEpostStatus('sendt')
+                        } else {
+                          setEpostStatus('feil')
+                          setEpostFeilmelding(res.error ?? 'Ukjent feil')
+                        }
+                      }}
+                      disabled={senderEpost || !ansvarligId || erNy}
+                      className="px-4 py-2 text-sm border border-[#4A9EDB] text-[#4A9EDB] rounded-lg hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2 shrink-0"
+                    >
+                      {senderEpost ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                          Sender...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                          </svg>
+                          Generer e-post
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {epostStatus === 'sendt' && (
+                    <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                      E-post sendt til {brukere.find(b => b.id === ansvarligId)?.navn}
+                    </p>
+                  )}
+                  {epostStatus === 'feil' && (
+                    <p className="text-xs text-red-500 mt-2">{epostFeilmelding}</p>
+                  )}
+                </div>
+              )}
             </>
           )}
 
