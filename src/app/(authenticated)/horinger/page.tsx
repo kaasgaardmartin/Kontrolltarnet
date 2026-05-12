@@ -178,14 +178,17 @@ export default function HoringerSide() {
     invaliderOffentligeHoringer()
   }
 
-  function eksporterExcel() {
+  function eksporterExcel(kilde: 'aktive' | 'arkiv') {
+    const data = kilde === 'arkiv' ? arkiverteHoringer : sortert
     const wb = XLSX.utils.book_new()
 
-    // Header-rad
-    const header = ['Tittel', 'Departement', 'Status', 'Publisert', 'Høringsfrist', 'Intern frist', 'Utvalg', 'Lead-utvalg', 'HB eDocs', 'HS eDocs', 'Lenke']
+    const header = [
+      'Tittel', 'Departement', 'Status', 'Publisert', 'Høringsfrist',
+      'Intern frist', 'Utvalg', 'Lead-utvalg',
+      'HB eDocs', 'HS eDocs', 'eDocs Lovutvalg', 'Lenke',
+    ]
 
-    // Data-rader
-    const rader = sortert.map(h => ({
+    const rader = data.map(h => ({
       Tittel: h.tittel,
       Departement: h.departement ?? '',
       Status: STATUS_LABEL[h.status as Exclude<OffentligHoringStatus, 'arkivert'>] ?? h.status,
@@ -196,12 +199,12 @@ export default function HoringerSide() {
       'Lead-utvalg': h.hoved_utvalg ?? '',
       'HB eDocs': h.horingsbrev_edocs ?? '',
       'HS eDocs': h.horingssvar_edocs ?? '',
+      'eDocs Lovutvalg': h.oversendelsesbrev_edocs ?? '',
       Lenke: h.regjeringen_url ?? '',
     }))
 
     const ws = XLSX.utils.json_to_sheet(rader, { header })
 
-    // Kolonnebredder
     ws['!cols'] = [
       { wch: 60 }, // Tittel
       { wch: 14 }, // Departement
@@ -213,25 +216,25 @@ export default function HoringerSide() {
       { wch: 25 }, // Lead-utvalg
       { wch: 11 }, // HB eDocs
       { wch: 11 }, // HS eDocs
+      { wch: 14 }, // eDocs Lovutvalg
       { wch: 55 }, // Lenke
     ]
 
-    // Frys header-rad
     ws['!freeze'] = { xSplit: 0, ySplit: 1 }
 
-    // Klikkbare lenker i Lenke-kolonnen (kolonne K = index 10)
-    sortert.forEach((h, i) => {
+    // Klikkbare lenker i Lenke-kolonnen (kolonne L = index 11)
+    data.forEach((h, i) => {
       if (!h.regjeringen_url) return
-      const celle = XLSX.utils.encode_cell({ r: i + 1, c: 10 })
-      ws[celle] = {
-        v: 'regjeringen.no',
-        t: 's',
-        l: { Target: h.regjeringen_url },
-      }
+      const celle = XLSX.utils.encode_cell({ r: i + 1, c: 11 })
+      ws[celle] = { v: 'regjeringen.no', t: 's', l: { Target: h.regjeringen_url } }
     })
 
+    const filnavn = kilde === 'arkiv'
+      ? `horinger-arkiv-${new Date().toISOString().slice(0, 10)}.xlsx`
+      : `horinger-${new Date().toISOString().slice(0, 10)}.xlsx`
+
     XLSX.utils.book_append_sheet(wb, ws, 'Høringer')
-    XLSX.writeFile(wb, `horinger-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    XLSX.writeFile(wb, filnavn)
   }
 
   // Count per status for badges
@@ -253,28 +256,40 @@ export default function HoringerSide() {
             }
           </p>
         </div>
-        {fane === 'aktive' && (
-          <div className="flex items-center gap-2">
-            {sortert.length > 0 && (
-              <button
-                onClick={eksporterExcel}
-                className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
-                title="Eksporter til Excel"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                </svg>
-                Eksporter
-              </button>
-            )}
+        <div className="flex items-center gap-2">
+          {fane === 'aktive' && sortert.length > 0 && (
+            <button
+              onClick={() => eksporterExcel('aktive')}
+              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
+              title="Eksporter til Excel"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Eksporter
+            </button>
+          )}
+          {fane === 'arkiv' && arkiverteHoringer.length > 0 && (
+            <button
+              onClick={() => eksporterExcel('arkiv')}
+              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
+              title="Eksporter arkiv til Excel"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Eksporter arkiv
+            </button>
+          )}
+          {fane === 'aktive' && (
             <button
               onClick={() => setModalHoring(null)}
               className="px-4 py-2 text-sm bg-[#4A9EDB] text-white rounded-lg hover:bg-[#3a8ecb] transition-colors"
             >
               + Legg til høring
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Fane-velger */}
