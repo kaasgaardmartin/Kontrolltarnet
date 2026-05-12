@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import * as XLSX from 'xlsx'
 import { useOffentligeHoringer, useArkiverteHoringer, useOrgBrukere, useInvaliderSakData } from '@/lib/queries'
 import { arkiverHoring, gjenopprettHoring } from '@/lib/actions'
 import type { OffentligHoring, OffentligHoringStatus } from '@/lib/actions'
@@ -119,6 +118,7 @@ export default function HoringerSide() {
   const [bekreftArkiverId, setBekreftArkiverId] = useState<string | null>(null)
   const [arkivererIds, setArkivererIds] = useState<Set<string>>(new Set())
   const [arkiverFeil, setArkiverFeil] = useState<string | null>(null)
+  const [eksporterer, setEksporterer] = useState(false)
 
   function toggleSort(kolonne: SortKolonne) {
     if (sortBy === kolonne) {
@@ -178,63 +178,161 @@ export default function HoringerSide() {
     invaliderOffentligeHoringer()
   }
 
-  function eksporterExcel(kilde: 'aktive' | 'arkiv') {
+  async function eksporterExcel(kilde: 'aktive' | 'arkiv') {
+    setEksporterer(true)
+    try {
     const data = kilde === 'arkiv' ? arkiverteHoringer : sortert
-    const wb = XLSX.utils.book_new()
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'Kontrolltårnet'
+    wb.created = new Date()
 
-    const header = [
-      'Tittel', 'Departement', 'Status', 'Publisert', 'Høringsfrist',
-      'Intern frist', 'Utvalg', 'Lead-utvalg',
-      'HB eDocs', 'HS eDocs', 'eDocs Lovutvalg', 'Lenke',
-    ]
-
-    const rader = data.map(h => ({
-      Tittel: h.tittel,
-      Departement: h.departement ?? '',
-      Status: STATUS_LABEL[h.status as Exclude<OffentligHoringStatus, 'arkivert'>] ?? h.status,
-      Publisert: h.publisert_dato ?? '',
-      Høringsfrist: h.horingsfrist ?? '',
-      'Intern frist': h.intern_frist ?? '',
-      Utvalg: h.utvalg.join(' | '),
-      'Lead-utvalg': h.hoved_utvalg ?? '',
-      'HB eDocs': h.horingsbrev_edocs ?? '',
-      'HS eDocs': h.horingssvar_edocs ?? '',
-      'eDocs Lovutvalg': h.oversendelsesbrev_edocs ?? '',
-      Lenke: h.regjeringen_url ?? '',
-    }))
-
-    const ws = XLSX.utils.json_to_sheet(rader, { header })
-
-    ws['!cols'] = [
-      { wch: 60 }, // Tittel
-      { wch: 14 }, // Departement
-      { wch: 16 }, // Status
-      { wch: 12 }, // Publisert
-      { wch: 14 }, // Høringsfrist
-      { wch: 13 }, // Intern frist
-      { wch: 35 }, // Utvalg
-      { wch: 25 }, // Lead-utvalg
-      { wch: 11 }, // HB eDocs
-      { wch: 11 }, // HS eDocs
-      { wch: 14 }, // eDocs Lovutvalg
-      { wch: 55 }, // Lenke
-    ]
-
-    ws['!freeze'] = { xSplit: 0, ySplit: 1 }
-
-    // Klikkbare lenker i Lenke-kolonnen (kolonne L = index 11)
-    data.forEach((h, i) => {
-      if (!h.regjeringen_url) return
-      const celle = XLSX.utils.encode_cell({ r: i + 1, c: 11 })
-      ws[celle] = { v: 'regjeringen.no', t: 's', l: { Target: h.regjeringen_url } }
+    const ws = wb.addWorksheet('Høringer', {
+      views: [{ state: 'frozen', ySplit: 1 }],
     })
 
-    const filnavn = kilde === 'arkiv'
+    // ---- Fargepalett ----
+    const HEADER_BG  = '0F1923'
+    const STATUS_FARGE: Record<string, { bg: string; fg: string }> = {
+      innkommet:     { bg: 'DBEAFE', fg: '1D4ED8' },
+      til_vurdering: { bg: 'FEF3C7', fg: '92400E' },
+      svarer:        { bg: 'D1FAE5', fg: '065F46' },
+      svarer_ikke:   { bg: 'F3F4F6', fg: '6B7280' },
+      levert:        { bg: 'EDE9FE', fg: '5B21B6' },
+      arkivert:      { bg: 'F3F4F6', fg: '6B7280' },
+    }
+    const RAD_GRAA   = 'F8F9FA'
+    const EDOCS_BG   = 'F1F5F9'
+    const EDOCS_TOM  = 'FFFBEB'   // gul = mangler
+    const DATO_ROED  = 'DC2626'
+    const LENKE_BLÅ  = '4A9EDB'
+
+    // ---- Kolonner ----
+    ws.columns = [
+      { header: 'Tittel',          key: 'tittel',        width: 70 },
+      { header: 'Departement',     key: 'dept',          width: 20 },
+      { header: 'Status',          key: 'status',        width: 18 },
+      { header: 'Publisert',       key: 'publisert',     width: 13 },
+      { header: 'Høringsfrist',    key: 'frist',         width: 14 },
+      { header: 'Intern frist',    key: 'internFrist',   width: 13 },
+      { header: 'Utvalg',          key: 'utvalg',        width: 40 },
+      { header: 'Lead-utvalg',     key: 'lead',          width: 28 },
+      { header: 'HB eDocs',        key: 'hbEdocs',       width: 12 },
+      { header: 'HS eDocs',        key: 'hsEdocs',       width: 12 },
+      { header: 'eDocs Lovutvalg', key: 'lovEdocs',      width: 16 },
+      { header: 'Lenke',           key: 'lenke',         width: 20 },
+    ]
+
+    // ---- Headerlinje ----
+    const headerRad = ws.getRow(1)
+    headerRad.height = 20
+    headerRad.eachCell(celle => {
+      celle.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } }
+      celle.font   = { bold: true, color: { argb: 'FFFFFF' }, size: 10, name: 'Calibri' }
+      celle.alignment = { vertical: 'middle', horizontal: 'left' }
+      celle.border = {
+        bottom: { style: 'medium', color: { argb: '4A9EDB' } },
+      }
+    })
+
+    // Autofilter på hele headerlinja
+    ws.autoFilter = { from: 'A1', to: 'L1' }
+
+    // ---- Datarader ----
+    const idag = new Date(); idag.setHours(0, 0, 0, 0)
+
+    function parseDato(iso: string | null): Date | null {
+      if (!iso) return null
+      const d = new Date(iso)
+      return isNaN(d.getTime()) ? null : d
+    }
+
+    data.forEach((h, idx) => {
+      const rad = ws.addRow({
+        tittel:     h.tittel,
+        dept:       h.departement ?? '',
+        status:     STATUS_LABEL[h.status as Exclude<OffentligHoringStatus, 'arkivert'>] ?? h.status,
+        publisert:  parseDato(h.publisert_dato),
+        frist:      parseDato(h.horingsfrist),
+        internFrist:parseDato(h.intern_frist),
+        utvalg:     h.utvalg.join(' | '),
+        lead:       h.hoved_utvalg ?? '',
+        hbEdocs:    h.horingsbrev_edocs ?? '',
+        hsEdocs:    h.horingssvar_edocs ?? '',
+        lovEdocs:   h.oversendelsesbrev_edocs ?? '',
+        lenke:      '',
+      })
+
+      rad.height = 18
+      const zebraFarge = idx % 2 === 0 ? 'FFFFFF' : RAD_GRAA
+
+      // Zebrastriping på alle celler
+      rad.eachCell({ includeEmpty: true }, (celle, kolNr) => {
+        celle.font = { size: 10, name: 'Calibri' }
+        celle.alignment = { vertical: 'middle', wrapText: kolNr === 1 }
+        celle.border = {
+          bottom: { style: 'thin', color: { argb: 'E5E7EB' } },
+          right:  { style: 'thin', color: { argb: 'E5E7EB' } },
+        }
+        celle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebraFarge } }
+      })
+
+      // Status-farging (kol 3)
+      const statusCelle = rad.getCell(3)
+      const sf = STATUS_FARGE[h.status] ?? STATUS_FARGE['innkommet']
+      statusCelle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sf.bg } }
+      statusCelle.font = { bold: true, size: 10, name: 'Calibri', color: { argb: sf.fg } }
+      statusCelle.alignment = { vertical: 'middle', horizontal: 'center' }
+
+      // Datoformat + rød frist hvis passert
+      ;[4, 5, 6].forEach(k => {
+        const c = rad.getCell(k)
+        if (c.value instanceof Date) {
+          c.numFmt = 'DD.MM.YYYY'
+          c.alignment = { vertical: 'middle', horizontal: 'center' }
+          if (k === 5 && c.value < idag) {
+            c.font = { size: 10, name: 'Calibri', color: { argb: DATO_ROED }, bold: true }
+          }
+        }
+      })
+
+      // eDocs-kolonner (9, 10, 11) — sentrert, grå/gul bakgrunn
+      ;[
+        { k: 9,  v: h.horingsbrev_edocs },
+        { k: 10, v: h.horingssvar_edocs },
+        { k: 11, v: h.oversendelsesbrev_edocs },
+      ].forEach(({ k, v }) => {
+        const c = rad.getCell(k)
+        c.alignment = { vertical: 'middle', horizontal: 'center' }
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: v ? EDOCS_BG : EDOCS_TOM } }
+        c.font = { size: 10, name: 'Calibri', ...(v ? {} : { color: { argb: 'D97706' } }) }
+      })
+
+      // Klikkbar lenke (kol 12)
+      if (h.regjeringen_url) {
+        const c = rad.getCell(12)
+        c.value = { text: 'regjeringen.no', hyperlink: h.regjeringen_url }
+        c.font  = { size: 10, name: 'Calibri', color: { argb: LENKE_BLÅ }, underline: true }
+        c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebraFarge } }
+      }
+    })
+
+    // ---- Last ned ----
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = kilde === 'arkiv'
       ? `horinger-arkiv-${new Date().toISOString().slice(0, 10)}.xlsx`
       : `horinger-${new Date().toISOString().slice(0, 10)}.xlsx`
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Høringer')
-    XLSX.writeFile(wb, filnavn)
+    a.click()
+    URL.revokeObjectURL(url)
+    } finally {
+      setEksporterer(false)
+    }
   }
 
   // Count per status for badges
@@ -260,25 +358,29 @@ export default function HoringerSide() {
           {fane === 'aktive' && sortert.length > 0 && (
             <button
               onClick={() => eksporterExcel('aktive')}
-              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
+              disabled={eksporterer}
+              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
               title="Eksporter til Excel"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              Eksporter
+              {eksporterer
+                ? <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              }
+              {eksporterer ? 'Genererer...' : 'Eksporter'}
             </button>
           )}
           {fane === 'arkiv' && arkiverteHoringer.length > 0 && (
             <button
               onClick={() => eksporterExcel('arkiv')}
-              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
+              disabled={eksporterer}
+              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
               title="Eksporter arkiv til Excel"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              Eksporter arkiv
+              {eksporterer
+                ? <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              }
+              {eksporterer ? 'Genererer...' : 'Eksporter arkiv'}
             </button>
           )}
           {fane === 'aktive' && (
