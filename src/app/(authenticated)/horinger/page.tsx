@@ -1,10 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useOffentligeHoringer, useArkiverteHoringer, useOrgBrukere, useInvaliderSakData } from '@/lib/queries'
 import { arkiverHoring, gjenopprettHoring } from '@/lib/actions'
 import type { OffentligHoring, OffentligHoringStatus } from '@/lib/actions'
 import OffentligHoringModal from '@/components/OffentligHoringModal'
+
+function kildeEtikett(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    if (host === 'regjeringen.no') return 'regjeringen.no'
+    return host
+  } catch {
+    return 'Lenke'
+  }
+}
 
 const STATUS_LABEL: Record<Exclude<OffentligHoringStatus, 'arkivert'>, string> = {
   innkommet: 'Innkommet',
@@ -107,6 +117,19 @@ export default function HoringerSide() {
   const { data: arkiverteHoringer = [], isLoading: lasterArkiv } = useArkiverteHoringer()
   const { data: brukere = [] } = useOrgBrukere()
   const { invaliderOffentligeHoringer } = useInvaliderSakData()
+  const harSynket = useRef(false)
+
+  useEffect(() => {
+    if (harSynket.current) return
+    const THROTTLE_MS = 5 * 60 * 1000
+    const sist = sessionStorage.getItem('synk-horinger-ts')
+    if (sist && Date.now() - Number(sist) < THROTTLE_MS) return
+    harSynket.current = true
+    sessionStorage.setItem('synk-horinger-ts', String(Date.now()))
+    fetch('/api/synk-horinger', { method: 'POST' })
+      .then(r => r.ok && invaliderOffentligeHoringer())
+      .catch(() => {})
+  }, [invaliderOffentligeHoringer])
 
   const [fane, setFane] = useState<'aktive' | 'arkiv'>('aktive')
   const [sok, setSok] = useState('')
@@ -446,7 +469,7 @@ export default function HoringerSide() {
                           onClick={e => e.stopPropagation()}
                           className="text-xs text-[#4A9EDB] hover:underline inline-flex items-center gap-1 mt-0.5"
                         >
-                          regjeringen.no
+                          {kildeEtikett(h.regjeringen_url!)}
                         </a>
                       )}
                     </td>
@@ -626,7 +649,7 @@ export default function HoringerSide() {
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.28" />
                             </svg>
-                            regjeringen.no
+                            {kildeEtikett(h.regjeringen_url!)}
                           </a>
                         )}
                       </div>
