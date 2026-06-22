@@ -1,16 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/fristpaminnelse",
-      "schedule": "0 7 * * *"
-    },
-    {
       "path": "/api/cron/oppdater-horinger",
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/hent-offentlige-horinger",
-      "schedule": "0 8 * * *"
+      "path": "/api/cron/fristpaminnelse",
+      "schedule": "0 7 * * *"
     }
   ]
 }

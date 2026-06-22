@@ -3,13 +3,14 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import { hentHoringerForSak } from '@/app/api/stortinget/route'
 
 // ============================================================
-// Cron-jobb: Oppdater høringer for alle aktive storting-saker
-// Kjøres daglig kl. 06:00 via Vercel Cron (se vercel.json)
-// Sikret med CRON_SECRET miljøvariabel
+// Samlet cron-jobb for høringer (kjøres daglig kl. 06:00)
+//
+// Del 1: Oppdater høringer fra Stortingets API for alle aktive saker
+// Del 2: Trigger Supabase Edge Function for regjeringen.no-scraping
+//        (Edge Function kjører på Deno Deploy / Cloudflare, som ikke
+//         blokkeres av regjeringen.no sin WAF slik Vercel-IP-er gjør)
 // ============================================================
 
-// Henter Stortingets sak-ID fra en stortingssak_ref URL
-// F.eks. "https://www.stortinget.no/...?p=87318" → "87318"
 function extractStortingsSakId(ref: string | null): string | null {
   if (!ref) return null
   try {
@@ -21,23 +22,7 @@ function extractStortingsSakId(ref: string | null): string | null {
   return null
 }
 
-export async function GET(request: NextRequest) {
-  // Verifiser cron-secret for å hindre uautorisert tilgang
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  if (!cronSecret) {
-    console.error('[cron/oppdater-horinger] CRON_SECRET er ikke satt')
-    return NextResponse.json({ error: 'Server-konfigurasjonsfeil' }, { status: 500 })
-  }
-
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Ikke autorisert' }, { status: 401 })
-  }
-
-  const supabase = await createServiceRoleClient()
-
-  // Hent alle aktive storting-saker (på tvers av alle organisasjoner)
+async function oppdaterStortingshoringer(supabase: Awaited<ReturnType<typeof createServiceRoleClient>>) {
   const { data: saker, error } = await supabase
     .from('saker')
     .select('id, organisasjon_id, stortingssak_ref, tittel')
@@ -46,11 +31,11 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error('[cron/oppdater-horinger] Feil ved henting av saker:', error)
-    return NextResponse.json({ error: 'Databasefeil' }, { status: 500 })
+    return { antall_saker: 0, antall_oppdatert: 0, antall_nye: 0, feil: [error.message] }
   }
 
   if (!saker || saker.length === 0) {
-    return NextResponse.json({ melding: 'Ingen storting-saker å oppdatere', antall_saker: 0 })
+    return { antall_saker: 0, antall_oppdatert: 0, antall_nye: 0, feil: [] }
   }
 
   let antallOppdatert = 0
@@ -62,11 +47,9 @@ export async function GET(request: NextRequest) {
     if (!stortingsSakId) continue
 
     try {
-      // Hent høringer fra Stortingets API
       const horinger = await hentHoringerForSak(stortingsSakId)
       if (horinger.length === 0) continue
 
-      // Sjekk eksisterende høringer for denne saken
       const { data: eksisterende } = await supabase
         .from('horinger')
         .select('horing_id')
@@ -75,7 +58,6 @@ export async function GET(request: NextRequest) {
       const eksisterendeIds = new Set((eksisterende ?? []).map((h: { horing_id: string }) => h.horing_id))
       const nyeHoringer = horinger.filter(h => !eksisterendeIds.has(h.horing_id))
 
-      // Upsert alle høringer (oppdaterer eksisterende + legger til nye)
       const rader = horinger.map(h => ({
         sak_id: sak.id,
         organisasjon_id: sak.organisasjon_id,
@@ -98,11 +80,9 @@ export async function GET(request: NextRequest) {
       } else {
         antallOppdatert++
         antallNyeHoringer += nyeHoringer.length
-
         if (nyeHoringer.length > 0) {
           console.log(
-            `[cron/oppdater-horinger] ${nyeHoringer.length} ny(e) høring(er) for "${sak.tittel}" (${stortingsSakId}):`,
-            nyeHoringer.map(h => h.horing_id).join(', ')
+            `[cron/oppdater-horinger] ${nyeHoringer.length} ny(e) høring(er) for "${sak.tittel}" (${stortingsSakId})`
           )
         }
       }
@@ -112,15 +92,78 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  console.log(
-    `[cron/oppdater-horinger] Ferdig. ${antallOppdatert}/${saker.length} saker oppdatert, ${antallNyeHoringer} nye høringer funnet.`
+  return { antall_saker: saker.length, antall_oppdatert: antallOppdatert, antall_nye: antallNyeHoringer, feil }
+}
+
+async function triggerOffentligeHoringer() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Mangler SUPABASE_URL eller SERVICE_ROLE_KEY')
+  }
+
+  const resp = await fetch(
+    `${supabaseUrl}/functions/v1/hent-offentlige-horinger`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(90_000),
+    }
   )
+
+  if (!resp.ok) {
+    const body = await resp.text()
+    throw new Error(`Edge function feilet: HTTP ${resp.status} — ${body}`)
+  }
+
+  return await resp.json()
+}
+
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
+
+  if (!cronSecret) {
+    console.error('[cron/oppdater-horinger] CRON_SECRET er ikke satt')
+    return NextResponse.json({ error: 'Server-konfigurasjonsfeil' }, { status: 500 })
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Ikke autorisert' }, { status: 401 })
+  }
+
+  const supabase = await createServiceRoleClient()
+
+  // Del 1: Stortinget-høringer
+  const storting = await oppdaterStortingshoringer(supabase)
+  console.log(
+    `[cron/oppdater-horinger] Storting: ${storting.antall_oppdatert}/${storting.antall_saker} saker, ${storting.antall_nye} nye høringer`
+  )
+
+  // Del 2: Offentlige høringer via Supabase Edge Function
+  let offentlige = { antall_funnet: 0, antall_nye: 0 }
+  try {
+    offentlige = await triggerOffentligeHoringer()
+    console.log(
+      `[cron/oppdater-horinger] Regjeringen.no: ${offentlige.antall_nye} nye av ${offentlige.antall_funnet} funnet`
+    )
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Ukjent feil'
+    console.error('[cron/oppdater-horinger] Edge function feilet:', msg)
+    storting.feil.push(`regjeringen.no: ${msg}`)
+  }
 
   return NextResponse.json({
     melding: 'Høringer oppdatert',
-    antall_saker_totalt: saker.length,
-    antall_saker_oppdatert: antallOppdatert,
-    antall_nye_horinger: antallNyeHoringer,
-    feil: feil.length > 0 ? feil : undefined,
+    storting: {
+      antall_saker: storting.antall_saker,
+      antall_oppdatert: storting.antall_oppdatert,
+      antall_nye: storting.antall_nye,
+    },
+    offentlige,
+    feil: storting.feil.length > 0 ? storting.feil : undefined,
   })
 }
