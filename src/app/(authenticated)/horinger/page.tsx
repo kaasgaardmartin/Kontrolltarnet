@@ -501,7 +501,21 @@ export default function HoringerSide() {
 
 
       {/* Status-kort */}
-      <div className="grid grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-6 gap-3 mb-6">
+        <button
+          onClick={() => setStatusFilter('alle')}
+          className={`p-3 rounded-xl border text-left transition-all ${
+            statusFilter === 'alle'
+              ? 'border-[#4A9EDB] bg-[#4A9EDB]/5 ring-1 ring-[#4A9EDB]'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="w-2 h-2 rounded-full bg-[#0F1923]" />
+            <span className="text-xs text-gray-500">Alle</span>
+          </div>
+          <span className="text-xl font-bold text-[#0F1923]">{horinger.length}</span>
+        </button>
         {ALLE_STATUSER.map(s => {
           const stil = STATUS_STIL[s]
           const aktiv = statusFilter === s
