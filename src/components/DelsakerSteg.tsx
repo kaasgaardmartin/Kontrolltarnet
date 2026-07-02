@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { opprettSak, type SakFormData } from '@/lib/actions'
 import { PARTIER } from '@/lib/types'
+import DraggableModal from '@/components/DraggableModal'
 
 interface Props {
   forelderId: string
@@ -82,14 +83,9 @@ export default function DelsakerSteg({ forelderId, forelderTittel, onFerdig, onL
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/40" onClick={onLukk} />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg">
+    <DraggableModal onLukk={onLukk} defaultWidth={520} defaultHeight={420} minWidth={360} minHeight={280}>
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 py-4 rounded-t-xl">
+        <div className="modal-drag-handle border-b border-gray-200 px-6 py-4 shrink-0 cursor-move select-none">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
               <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -181,7 +177,6 @@ export default function DelsakerSteg({ forelderId, forelderTittel, onFerdig, onL
             }
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   )
 }

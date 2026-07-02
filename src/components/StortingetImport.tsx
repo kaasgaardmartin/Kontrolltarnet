@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import type { StortingetSak } from '@/app/api/stortinget/route'
+import DraggableModal from '@/components/DraggableModal'
 
 interface Props {
   onImporter: (sak: StortingetSak) => void
@@ -114,14 +115,9 @@ export default function StortingetImport({ onImporter, onLukk }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] px-4">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/40" onClick={onLukk} />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-3xl max-h-[85vh] flex flex-col">
+    <DraggableModal onLukk={onLukk} defaultWidth={800} defaultHeight={700} minWidth={500} minHeight={400}>
         {/* Header */}
-        <div className="shrink-0 border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
+        <div className="modal-drag-handle shrink-0 border-b border-gray-200 px-6 py-4 flex items-center justify-between cursor-move select-none">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-[#BA0C2F]/10 flex items-center justify-center">
               <svg className="w-4 h-4 text-[#BA0C2F]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -302,7 +298,6 @@ export default function StortingetImport({ onImporter, onLukk }: Props) {
             Lukk
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   )
 }

@@ -123,6 +123,7 @@ export default function Toppmeny() {
     { href: '/mine-oppgaver', label: 'Mine oppgaver' },
     { href: '/admin', label: 'Komiteer' },
     ...(erOrgAdmin ? [{ href: '/admin/brukere', label: 'Brukere' }] : []),
+    ...(erOrgAdmin ? [{ href: '/admin/lovutvalg', label: 'Lovutvalg' }] : []),
   ]
 
   return (
@@ -269,6 +270,13 @@ export default function Toppmeny() {
                       </span>
                     )}
                   </div>
+                  <Link
+                    href="/min-side"
+                    onClick={() => setShowProfile(false)}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Min side
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"

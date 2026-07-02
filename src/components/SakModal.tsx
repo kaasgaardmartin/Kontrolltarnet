@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { PARTIER, type Stemme, type Niva, type Landing } from '@/lib/types'
 import { opprettSak, oppdaterSak, slettSak, type SakFormData, type SakMedStemmer } from '@/lib/actions'
 import type { StortingetSak } from '@/app/api/stortinget/route'
+import DraggableModal from '@/components/DraggableModal'
 
 interface Komite {
   id: string
@@ -158,23 +159,19 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/40" onClick={onLukk} />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+    <DraggableModal onLukk={onLukk} defaultWidth={680} defaultHeight={680} minWidth={440} minHeight={300}>
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
+        <div className="modal-drag-handle border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 cursor-move select-none">
           <h2 className="text-lg font-semibold text-[#0F1923]">
             {erNy ? (forelderId ? 'Ny delsak' : 'Ny sak') : 'Rediger sak'}
           </h2>
-          <button onClick={onLukk} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={onLukk} className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
+        <div className="flex-1 overflow-y-auto">
 
         <div className="px-6 py-5 space-y-5">
           {/* Stortinget-import banner */}
@@ -444,7 +441,7 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
             </button>
           </div>
         </div>
-      </div>
-    </div>
+        </div>
+    </DraggableModal>
   )
 }

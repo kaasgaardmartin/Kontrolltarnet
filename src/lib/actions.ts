@@ -1698,3 +1698,309 @@ export async function sendHoringEpostTilAnsvarlig(
     vedlegg: (h.vedlegg ?? []) as { tittel: string; url: string; type: string }[],
   })
 }
+
+// ─── Min side / varslingsinnstillinger ─────────────────────────────────────
+
+export interface EpostInnstillinger {
+  epost_oppgave_tildelt: boolean
+  epost_fristpaminnelse: boolean
+  epost_horingsfrist: boolean
+  epost_sakoppdatering: boolean
+  epost_horing_til_behandling: boolean
+  epost_mandagsliste: boolean
+}
+
+export async function hentEpostInnstillinger(): Promise<EpostInnstillinger | null> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data } = await supabase
+    .from('brukere')
+    .select('epost_oppgave_tildelt, epost_fristpaminnelse, epost_horingsfrist, epost_sakoppdatering, epost_horing_til_behandling, epost_mandagsliste')
+    .eq('id', user.id)
+    .single()
+
+  return data ?? null
+}
+
+export async function sendTestHoringEpost(): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg() as Awaited<ReturnType<typeof hentBrukerOgOrg>> & { epost: string; navn: string } | null
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+
+  // Hent nyeste høring i organisasjonen som eksempel
+  const { data: h } = await supabase
+    .from('offentlige_horinger')
+    .select('*')
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (!h) return { success: false, error: 'Ingen høringer funnet å teste med' }
+
+  const { sendHoringTilBehandlingEpost } = await import('@/lib/email')
+  return sendHoringTilBehandlingEpost({
+    tilEpost: bruker.epost,
+    tilNavn: bruker.navn,
+    avsenderNavn: bruker.navn,
+    avsenderEpost: bruker.epost,
+    tittel: h.tittel,
+    departement: h.departement ?? '',
+    horingsfrist: h.horingsfrist,
+    internFrist: h.intern_frist,
+    utvalg: h.utvalg ?? [],
+    regjeringenUrl: h.regjeringen_url,
+    vedlegg: (h.vedlegg ?? []) as { tittel: string; url: string; type: string }[],
+  })
+}
+
+export async function sendTestMandagsliste(): Promise<{ success: boolean; antall?: number; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg() as Awaited<ReturnType<typeof hentBrukerOgOrg>> & { epost: string; navn: string } | null
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+
+  const { data: horinger } = await supabase
+    .from('offentlige_horinger')
+    .select('tittel, departement, utvalg, horingsfrist, intern_frist, regjeringen_url, status')
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .in('status', ['innkommet', 'til_vurdering', 'svarer'])
+    .order('intern_frist', { ascending: true, nullsFirst: false })
+
+  const liste = horinger ?? []
+  const datoDag = new Date().toLocaleDateString('nb-NO', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+
+  const { sendMandagslisteEpost } = await import('@/lib/email')
+  const res = await sendMandagslisteEpost({
+    tilEpost: bruker.epost,
+    tilNavn: bruker.navn,
+    dato: datoDag,
+    horinger: liste.map((h: any) => ({
+      tittel: h.tittel,
+      departement: h.departement,
+      utvalg: h.utvalg ?? [],
+      horingsfrist: h.horingsfrist,
+      internFrist: h.intern_frist,
+      regjeringenUrl: h.regjeringen_url,
+      status: h.status,
+    })),
+  })
+
+  if (!res.success) return { success: false, error: res.error }
+  return { success: true, antall: liste.length }
+}
+
+export async function oppdaterEpostInnstillinger(
+  innstillinger: Partial<EpostInnstillinger>
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Ikke innlogget' }
+
+  const { error } = await supabase
+    .from('brukere')
+    .update(innstillinger)
+    .eq('id', user.id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function hentMinBrukerProfil() {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data } = await supabase
+    .from('brukere')
+    .select(`
+      id, navn, epost, rolle, created_at,
+      epost_oppgave_tildelt, epost_fristpaminnelse,
+      epost_horingsfrist, epost_sakoppdatering, epost_horing_til_behandling, epost_mandagsliste,
+      organisasjoner(navn)
+    `)
+    .eq('id', user.id)
+    .single()
+
+  return data ?? null
+}
+
+// ─── Lovutvalg ──────────────────────────────────────────────────────────────
+
+export interface LovutvalgMedlem {
+  id: string
+  navn: string
+  epost: string
+}
+
+export interface Lovutvalg {
+  id: string
+  navn: string
+  medlemmer: LovutvalgMedlem[]
+}
+
+export async function hentLovutvalg(): Promise<Lovutvalg[]> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const { data } = await supabase
+    .from('lovutvalg')
+    .select('id, navn, lovutvalg_medlemmer(id, navn, epost)')
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .order('navn')
+
+  return (data ?? []).map((u: any) => ({
+    id: u.id,
+    navn: u.navn,
+    medlemmer: u.lovutvalg_medlemmer ?? [],
+  }))
+}
+
+export async function hentLovutvalgForHoring(utvalgNavn: string[]): Promise<{ utvalg: string; medlemmer: LovutvalgMedlem[] }[]> {
+  if (utvalgNavn.length === 0) return []
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const { data } = await supabase
+    .from('lovutvalg')
+    .select('id, navn, lovutvalg_medlemmer(id, navn, epost)')
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .in('navn', utvalgNavn)
+
+  return (data ?? []).map((u: any) => ({
+    utvalg: u.navn,
+    medlemmer: u.lovutvalg_medlemmer ?? [],
+  }))
+}
+
+export async function opprettLovutvalg(navn: string): Promise<{ success: boolean; id?: string; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+
+  const { data, error } = await supabase
+    .from('lovutvalg')
+    .insert({ navn: navn.trim(), organisasjon_id: bruker.organisasjon_id })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, id: data.id }
+}
+
+export async function slettLovutvalg(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('lovutvalg').delete().eq('id', id)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function leggTilMedlem(
+  lovutvalgId: string,
+  navn: string,
+  epost: string
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('lovutvalg_medlemmer')
+    .insert({ lovutvalg_id: lovutvalgId, navn: navn.trim(), epost: epost.trim().toLowerCase() })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, id: data.id }
+}
+
+export async function slettMedlem(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('lovutvalg_medlemmer').delete().eq('id', id)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function sendHoringTilUtvalgMedlemmer(params: {
+  horingId: string
+  mottakere: { navn: string; epost: string }[]
+}): Promise<{ success: boolean; sendt: number; feilet: number; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const avsender = await hentBrukerOgOrg() as Awaited<ReturnType<typeof hentBrukerOgOrg>> & { epost: string; navn: string } | null
+  if (!avsender) return { success: false, sendt: 0, feilet: 0, error: 'Ikke innlogget' }
+
+  const { data: h } = await supabase
+    .from('offentlige_horinger')
+    .select('*')
+    .eq('id', params.horingId)
+    .single()
+  if (!h) return { success: false, sendt: 0, feilet: 0, error: 'Høring ikke funnet' }
+
+  const { sendHoringTilBehandlingEpost } = await import('@/lib/email')
+  let sendt = 0, feilet = 0
+
+  for (const mottaker of params.mottakere) {
+    const res = await sendHoringTilBehandlingEpost({
+      tilEpost: mottaker.epost,
+      tilNavn: mottaker.navn,
+      avsenderNavn: avsender.navn,
+      avsenderEpost: avsender.epost,
+      tittel: h.tittel,
+      departement: h.departement ?? '',
+      horingsfrist: h.horingsfrist,
+      internFrist: h.intern_frist,
+      utvalg: h.utvalg ?? [],
+      regjeringenUrl: h.regjeringen_url,
+      vedlegg: (h.vedlegg ?? []) as { tittel: string; url: string; type: string }[],
+    })
+    if (res.success) sendt++
+    else feilet++
+  }
+
+  return { success: true, sendt, feilet }
+}
+
+export async function genererHoringEpostHtml(horingId: string): Promise<{ html: string; subject: string; avsenderNavn: string; avsenderEpost: string } | null> {
+  const supabase = await createServerSupabaseClient()
+  const avsender = await hentBrukerOgOrg() as any
+  if (!avsender) return null
+
+  const { data: h } = await supabase
+    .from('offentlige_horinger')
+    .select('*')
+    .eq('id', horingId)
+    .single()
+  if (!h) return null
+
+  const { byggHoringEpostHtml } = await import('@/lib/email')
+  const result = byggHoringEpostHtml({
+    avsenderNavn: avsender.navn,
+    avsenderEpost: avsender.epost,
+    tittel: h.tittel,
+    departement: h.departement ?? '',
+    horingsfrist: h.horingsfrist,
+    internFrist: h.intern_frist,
+    utvalg: h.utvalg ?? [],
+    regjeringenUrl: h.regjeringen_url,
+    vedlegg: (h.vedlegg ?? []) as { tittel: string; url: string; type: string }[],
+  })
+  return { ...result, avsenderNavn: avsender.navn, avsenderEpost: avsender.epost }
+}
+
+export async function sendHoringEpostTilMedlemmer(params: {
+  mottakere: { navn: string; epost: string }[]
+  subject: string
+  html: string
+}): Promise<{ success: boolean; sendt: number; feilet: number; error?: string }> {
+  if (params.mottakere.length === 0) return { success: false, sendt: 0, feilet: 0, error: 'Ingen mottakere valgt' }
+  const { sendEpostRaw } = await import('@/lib/email')
+  let sendt = 0, feilet = 0
+  for (const m of params.mottakere) {
+    const res = await sendEpostRaw({ to: m.epost, subject: params.subject, html: params.html })
+    if (res.success) sendt++
+    else feilet++
+  }
+  return { success: true, sendt, feilet }
+}

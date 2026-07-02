@@ -95,6 +95,158 @@ function erInstansJunk(tekst: string): boolean {
   return junkMønstre.some(r => r.test(tekst.trim()))
 }
 
+// ─── Generisk scraper (fungerer på alle norske offentlige nettsteder) ───────────
+
+export async function skrapGenerellSide(url: string): Promise<HoringScrapeResultat> {
+  const resp = await fetch(url, {
+    headers: { 'Accept-Language': 'nb-NO,nb;q=0.9', 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} fra ${new URL(url).hostname}`)
+  const rawHtml = await resp.text()
+  const html = dekodTegnEntiteter(rawHtml)
+
+  // ---- Tittel ----
+  const tittel =
+    (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1] &&
+      renskTekst(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1].replace(/<[^>]+>/g, '')))
+    || (html.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] &&
+      renskTekst(html.match(/<title[^>]*>([\s\S]*?)<\/title>/)![1].replace(/<[^>]+>/g, '')).split('|')[0].trim())
+    || (html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1] &&
+      renskTekst(html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)![1]))
+    || 'Ukjent tittel'
+
+  // ---- Departement / avsender ----
+  // Forsøk 1: meta-tags
+  const metaAuthor =
+    html.match(/<meta[^>]*name="author"[^>]*content="([^"]+)"/i)?.[1]
+    || html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]+)"/i)?.[1]
+
+  // Forsøk 2: vanlige strukturelle klasser
+  const strukturKlasser = [
+    'site-name', 'logo', 'header-title', 'publisher', 'org-name',
+    'article-source', 'byline', 'author', 'department',
+  ]
+  let strukturTreff: string | null = null
+  for (const kl of strukturKlasser) {
+    const m = html.match(new RegExp(`class="[^"]*${kl}[^"]*"[^>]*>([^<]{3,80})`, 'i'))
+    if (m) { strukturTreff = renskTekst(m[1]); break }
+  }
+
+  // Forsøk 3: hostname → lesbart navn
+  const hostname = new URL(url).hostname.replace(/^www\./, '')
+  const hostnameNavn = hostname.charAt(0).toUpperCase() + hostname.slice(1)
+
+  const departement = metaAuthor
+    ? renskTekst(metaAuthor)
+    : strukturTreff || hostnameNavn
+
+  // ---- Datoer ----
+  let horingsfrist: string | null = null
+  let publisert_dato: string | null = null
+
+  // Bredt søk etter høringsfrist — fanger "høringsfrist", "frist for å sende", "svar innen" etc.
+  const fristMønstre = [
+    /[Hh]øringsfrist[^<:\d]*[:\s]*[\s\S]{0,40}?(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})/,
+    /[Hh]øringsfrist[^<:\d]*[:\s]*[\s\S]{0,60}?(\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i,
+    /[Ff]rist\s+(?:for\s+)?(?:å\s+sende|innspill|svar)[^<]*?(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})/i,
+    /[Ff]rist\s+(?:for\s+)?(?:å\s+sende|innspill|svar)[^<]*?(\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i,
+    /[Ss]var(?:frist|es)[^<:]*?[:\s]*(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})/,
+    /[Hh]øringssvaret\s+(?:skal\s+)?(?:være\s+)?(?:inne\s+)?(?:senest\s+)?(?:innen\s+)?(\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)\s*\d{4})/i,
+  ]
+  for (const mønster of fristMønstre) {
+    const m = html.match(mønster)
+    if (m?.[1]) { horingsfrist = parseNorskDato(m[1]); break }
+  }
+
+  // Publiseringsdato
+  const pubMønstre = [
+    /<meta[^>]*(?:name="date"|name="DC\.Date"|property="article:published_time")[^>]*content="([^"]+)"/i,
+    /[Pp]ublisert[:\s]*(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})/,
+    /<time[^>]*datetime="([^"]+)"/,
+  ]
+  for (const mønster of pubMønstre) {
+    const m = html.match(mønster)
+    if (m?.[1]) { publisert_dato = m[1].length > 10 ? m[1].substring(0, 10) : parseNorskDato(m[1]); break }
+  }
+
+  // ---- Referanse ----
+  const referanseMatch =
+    html.match(/[Ss]aksnr\.?\s*[:\s]*(\d{2,4}\/\d+)/i)
+    || html.match(/[Vv]år\s+ref\.?\s*[:\s]*([A-Z0-9\/\-\.]+)/i)
+    || html.match(/(?:Referanse|Arkiv(?:nr|ref))[:\s]*([A-Z0-9\/\-\.]+)/i)
+  const referanse = referanseMatch ? renskTekst(referanseMatch[1]) : null
+
+  // ---- Høring type ----
+  let horing_type: 'skriftlig' | 'muntlig' | 'begge' | null = null
+  const htmlLower = html.toLowerCase()
+  if (htmlLower.includes('skriftlig') && htmlLower.includes('muntlig')) horing_type = 'begge'
+  else if (htmlLower.includes('skriftlig høring') || htmlLower.includes('skriftlige innspill')) horing_type = 'skriftlig'
+  else if (htmlLower.includes('muntlig høring') || htmlLower.includes('åpent møte')) horing_type = 'muntlig'
+  else horing_type = 'skriftlig' // default for nettsider som bruker begrepet høring
+
+  // ---- Beskrivelse ----
+  // Prøv meta description, deretter ingress-paragraf
+  let beskrivelse: string | null =
+    html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i)?.[1]
+    || html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i)?.[1]
+    || null
+  if (beskrivelse) beskrivelse = renskTekst(beskrivelse)
+
+  // Forsøk på å hente intro-tekst fra artikkelen (første substantielle avsnitt)
+  if (!beskrivelse || beskrivelse.length < 80) {
+    const alleAvsnitt = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    const substansielle = alleAvsnitt
+      .map(([, t]) => renskTekst(t.replace(/<[^>]+>/g, '')))
+      .filter(t => t.length > 100 && !t.match(/^(Copyright|Kontakt|Telefon|E-?post|Org\.?nr|Adresse)/i))
+    if (substansielle.length > 0) {
+      const ekstra = substansielle.slice(0, 3).join('\n\n')
+      beskrivelse = beskrivelse ? beskrivelse + '\n\n' + ekstra : ekstra
+    }
+  }
+
+  if (beskrivelse && beskrivelse.length > 5000) {
+    beskrivelse = beskrivelse.substring(0, 5000).replace(/\s+\S*$/, '…')
+  }
+
+  // ---- Vedlegg (PDF-lenker) ----
+  const vedlegg: HoringVedlegg[] = []
+  const baseUrl = `${new URL(url).protocol}//${new URL(url).hostname}`
+  const pdfMønster = /<a\s[^>]*href="([^"]*\.pdf[^"]*)"[^>]*>([^<]*)<\/a>/gi
+  let pdfMatch: RegExpExecArray | null
+  const sett = new Set<string>()
+  while ((pdfMatch = pdfMønster.exec(html)) !== null) {
+    let pdfUrl = pdfMatch[1]
+    const pdfTittel = renskTekst(pdfMatch[2]) || pdfUrl.split('/').pop() || 'Vedlegg'
+    if (pdfTittel.length < 2) continue
+    if (pdfUrl.startsWith('/')) pdfUrl = baseUrl + pdfUrl
+    if (sett.has(pdfUrl)) continue
+    sett.add(pdfUrl)
+    // Gjett type ut fra tittel/url
+    const erBrev = /brev|høringsbrev/i.test(pdfTittel + pdfUrl)
+    const erNotat = /notat|forslag|utredning|rapport/i.test(pdfTittel + pdfUrl)
+    vedlegg.push({
+      tittel: pdfTittel,
+      url: pdfUrl,
+      type: erBrev ? 'horingsbrev' : erNotat ? 'horingsnotat' : 'annet',
+    })
+  }
+
+  return {
+    tittel,
+    departement,
+    horingsfrist,
+    publisert_dato,
+    referanse,
+    horing_type,
+    beskrivelse,
+    horing_instanser: [], // vanskelig å hente generelt
+    vedlegg,
+  }
+}
+
+// ─── regjeringen.no-scraper ──────────────────────────────────────────────────
+
 // Henter og parser en regjeringen.no høring-side
 export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeResultat> {
   const resp = await fetch(url, {

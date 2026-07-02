@@ -31,6 +31,14 @@ function baseTemplate(innhold: string): string {
   `
 }
 
+function plainTemplate(innhold: string): string {
+  return `
+    <div style="font-family: Aptos, 'Aptos Display', Calibri, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #000000;">
+      ${innhold}
+    </div>
+  `
+}
+
 // ─── Oppgave tildelt ────────────────────────────────────────────────
 
 export async function sendOppgaveTildeltEpost(params: {
@@ -237,9 +245,8 @@ export async function sendSakOppdateringEpost(params: {
 
 // ─── Høring til behandling ──────────────────────────────────────────
 
-export async function sendHoringTilBehandlingEpost(params: {
-  tilEpost: string
-  tilNavn: string
+export interface HoringEpostParams {
+  tilNavn?: string
   avsenderNavn: string
   avsenderEpost: string
   tittel: string
@@ -249,102 +256,216 @@ export async function sendHoringTilBehandlingEpost(params: {
   utvalg: string[]
   regjeringenUrl: string | null
   vedlegg: { tittel: string; url: string; type: string }[]
-}) {
+}
+
+export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; subject: string } {
   function fmtDato(iso: string | null) {
     if (!iso) return '(ikke satt)'
     return new Date(iso).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' })
   }
 
-  const utvalgTekst = params.utvalg.length > 0
-    ? params.utvalg.join(', ')
-    : '(ikke tildelt utvalg)'
+  const antallUtvalg = params.utvalg.length
+  function liten(s: string) { return s.charAt(0).toLowerCase() + s.slice(1) }
 
-  const vedleggHtml = params.vedlegg.length > 0
-    ? `<p style="margin:0 0 4px;font-size:13px;color:#374151;font-weight:600;">Vedlegg:</p>
-       <ul style="margin:0 0 16px;padding-left:20px;">
-         ${params.vedlegg.map(v =>
-           `<li style="font-size:13px;color:#374151;margin-bottom:4px;">
-              <a href="${v.url}" style="color:#4A9EDB;">${v.tittel}</a>
-            </li>`
-         ).join('')}
-       </ul>`
-    : ''
+  function byggUtvalgAvsnitt(): string {
+    if (antallUtvalg === 0) {
+      return `<p style="font-size:14px;color:#000000;margin:0 0 14px;">
+        Vi ber lovutvalget om å se på høringen og eventuelt utarbeide forslag til foreningens høringsuttalelse i saken.
+      </p>`
+    }
+    if (antallUtvalg === 1) {
+      return `<p style="font-size:14px;color:#000000;margin:0 0 14px;">
+        Vi ber lovutvalget for <strong>${liten(params.utvalg[0])}</strong> om å se på høringen og eventuelt utarbeide forslag til foreningens høringsuttalelse i saken.
+      </p>`
+    }
+    // Flere utvalg: setning + punktliste (liten forbokstav i listen også)
+    const listeHtml = params.utvalg
+      .map(u => `<li style="font-size:14px;color:#000000;margin-bottom:3px;">${liten(u)}</li>`)
+      .join('')
+    return `<p style="font-size:14px;color:#000000;margin:0 0 6px;">
+        Vi ber følgende lovutvalg om å se på høringen og eventuelt utarbeide forslag til foreningens høringsuttalelse i saken:
+      </p>
+      <ul style="margin:0 0 14px;padding-left:20px;">${listeHtml}</ul>`
+  }
 
-  const lenkeHtml = params.regjeringenUrl
-    ? `<p style="margin:0 0 16px;">
-         <a href="${params.regjeringenUrl}" style="color:#4A9EDB;font-size:13px;">
-           Se høringen på regjeringen.no →
-         </a>
-       </p>`
-    : ''
+  // Lenker og vedlegg som →-piler
+  const pilerHtml = [
+    ...(params.regjeringenUrl
+      ? [`<p style="font-size:14px;color:#000000;margin:0 0 5px;">→ <a href="${params.regjeringenUrl}" style="color:#000000;">Se høringen på regjeringen.no</a></p>`]
+      : []),
+    ...params.vedlegg.map(v =>
+      `<p style="font-size:14px;color:#000000;margin:0 0 5px;">→ <a href="${v.url}" style="color:#000000;">${v.tittel}</a></p>`
+    ),
+  ].join('')
 
-  const html = baseTemplate(`
-    <p style="font-size:14px;color:#374151;margin:0 0 16px;">Hei ${params.tilNavn},</p>
+  const html = plainTemplate(`
+    <p style="font-size:14px;color:#000000;margin:0 0 14px;">Hei,</p>
 
-    <p style="font-size:14px;color:#374151;margin:0 0 16px;">
-      ${params.departement ? `<strong>${params.departement}</strong> sender` : 'Det er sendt'}
-      følgende høring med frist <strong>${fmtDato(params.horingsfrist)}</strong>:
+    <p style="font-size:14px;color:#000000;margin:0 0 8px;">
+      Advokatforeningen har mottatt følgende høring fra
+      ${params.departement ? params.departement : 'et departement'}:
+      ${params.tittel}.
     </p>
 
-    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin-bottom:16px;">
-      <p style="font-size:15px;font-weight:700;color:#0F1923;margin:0 0 8px;">${params.tittel}</p>
-      <p style="font-size:13px;color:#6b7280;margin:0;">
-        Vi ber lovutvalget for <strong>${utvalgTekst}</strong> om å vurdere høringen
-        og eventuelt utarbeide forslag til høringsuttalelse.
-      </p>
-    </div>
+    ${pilerHtml ? `<div style="margin:0 0 16px;">${pilerHtml}</div>` : ''}
 
-    <table style="border-collapse:collapse;margin-bottom:16px;">
-      <tr>
-        <td style="font-size:12px;color:#6b7280;padding:2px 12px 2px 0;white-space:nowrap;">📅 Høringsfrist</td>
-        <td style="font-size:13px;color:#0F1923;font-weight:600;">${fmtDato(params.horingsfrist)}</td>
-      </tr>
-      <tr>
-        <td style="font-size:12px;color:#6b7280;padding:2px 12px 2px 0;white-space:nowrap;">📅 Intern frist</td>
-        <td style="font-size:13px;color:#0F1923;font-weight:600;">${fmtDato(params.internFrist)}</td>
-      </tr>
+    ${byggUtvalgAvsnitt()}
+
+    <p style="font-size:14px;color:#000000;margin:-8px 0 14px;">
+      Dersom det vurderes at høringsbrevet bør forelegges flere lovutvalg, bes det om rask tilbakemelding til sekretariatet.
+    </p>
+
+    <p style="font-size:15px;color:#000000;font-weight:600;text-decoration:underline;margin:0 0 16px;">
+      Den interne fristen for utkast til høringsuttalelse er: ${fmtDato(params.internFrist)}
+    </p>
+
+    <p style="font-size:14px;color:#000000;margin:0 0 20px;">
+      Bekreft til <a href="mailto:${params.avsenderEpost}" style="color:#000000;">${params.avsenderNavn}</a>
+      om lovutvalget vil sende forslag til høringsuttalelse innen fristen.
+      Meld fra så snart som mulig dersom det er behov for fristutsettelse, slik at sekretariatet kan sende forespørsel.
+      Dersom lovutvalget mener det ikke er behov for å inngi høringsuttalelse, bes det om en kort begrunnelse.
+    </p>
+
+    <hr style="border:none;border-top:1px solid #d1d5db;margin:0 0 16px;" />
+
+    <p style="font-size:13px;font-weight:600;color:#000000;margin:0 0 10px;">Generelle retningslinjer for utarbeidelse av høringsuttalelser</p>
+
+    <p style="font-size:13px;color:#000000;margin:0 0 3px;font-weight:600;">I. Struktur</p>
+    <ol style="font-size:13px;color:#000000;margin:0 0 12px;padding-left:20px;line-height:1.75;">
+      <li style="margin-bottom:6px;"><strong>Innledning:</strong> Standard fast innledning legges inn av sekretariatet og tilpasses målform.</li>
+      <li style="margin-bottom:6px;"><strong>Sakens bakgrunn:</strong> Vi viser til høringen til …, publisert xx. måned 20xx, med høringsfrist den xx. måned 20xx. Høringen gjelder …. Denne høringsuttalelsen er i hovedsak utarbeidet av Advokatforeningens lovutvalg for …. Lovutvalget består av (legges inn av sekretariatet), som alle har lang erfaring og kompetanse innenfor det aktuelle rettsområdet.</li>
+      <li style="margin-bottom:6px;"><strong>Kommentarer til forslagene:</strong> Vi ber om at departementets systematikk følges (overskrifter/nummerering i høringsbrevet). Det er også en fordel om det avslutningsvis under hvert enkelt punkt kan formuleres et standpunkt eller konklusjon, eksempelvis «Advokatforeningen foreslår etter dette følgende omformulering…» eller «På denne bakgrunn går Advokatforeningen mot forslaget om å endre lovbestemmelsen.»</li>
+      <li><strong>Oppsummering:</strong> Gjenta hovedsynspunktene til slutt.</li>
+    </ol>
+
+    <p style="font-size:13px;color:#000000;margin:0 0 3px;font-weight:600;">II. Språk</p>
+    <ol style="font-size:13px;color:#000000;margin:0 0 12px;padding-left:20px;line-height:1.75;">
+      <li style="margin-bottom:6px;">Bruk formuleringer som «Advokatforeningen mener …», «Advokatforeningen finner …» eller «Etter Advokatforeningens syn …». Unngå uttrykk som «Advokatforeningen hevder …» eller «Advokatforeningen gjør gjeldende …». Årsaken er høringsuttalelsens formål: Advokatforeningen fremmer sine syn i forbindelse med generell regelutforming underlagt politiske beslutningsprosesser, ikke som rettslig argumentasjon i konkrete rettsspørsmål.</li>
+      <li>Skriv i Advokatforeningens navn, og unngå bruk av «jeg» og «vi».</li>
+    </ol>
+
+    <p style="font-size:13px;color:#000000;margin:0;">
+      Det vises ellers til
+      <a href="https://www.advokatforeningen.no/om-advokatforeningen/organisasjon/foreningsorganer/lovutvalgene/retningslinjer-for-lovutvalgene/" style="color:#000000;">retningslinjene for Advokatforeningens lovutvalg</a>.
+    </p>
+  `)
+
+  return { html, subject: params.tittel }
+}
+
+export async function sendHoringTilBehandlingEpost(params: HoringEpostParams & { tilEpost: string }) {
+  const { html, subject } = byggHoringEpostHtml(params)
+  return sendEpost({ to: params.tilEpost, subject, html })
+}
+
+// ─── Mandagsliste ───────────────────────────────────────────────────
+
+export interface MandagslisteHoring {
+  tittel: string
+  departement: string | null
+  utvalg: string[]
+  horingsfrist: string | null
+  internFrist: string | null
+  regjeringenUrl: string | null
+  status: string
+}
+
+export async function sendMandagslisteEpost(params: {
+  tilEpost: string
+  tilNavn: string
+  horinger: MandagslisteHoring[]
+  dato: string
+}): Promise<{ success: boolean; error?: string }> {
+  function fmtDato(iso: string | null) {
+    if (!iso) return '–'
+    return new Date(iso).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  function statusLabel(s: string) {
+    const map: Record<string, string> = {
+      innkommet: 'Innkommet',
+      til_vurdering: 'Til vurdering',
+      svarer: 'Vi svarer',
+      svarer_ikke: 'Svarer ikke',
+      levert: 'Levert',
+      arkivert: 'Arkivert',
+    }
+    return map[s] ?? s
+  }
+
+  function fristFarge(iso: string | null): string {
+    if (!iso) return '#6b7280'
+    const dager = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)
+    if (dager < 0) return '#dc2626'
+    if (dager <= 7) return '#ea580c'
+    if (dager <= 14) return '#d97706'
+    return '#374151'
+  }
+
+  const radHtml = params.horinger.map((h, i) => {
+    const utvalgTekst = h.utvalg.length > 0 ? h.utvalg.join(', ') : '–'
+    const rad = i % 2 === 0 ? '#ffffff' : '#f9fafb'
+    return `
+      <tr style="background:${rad};">
+        <td style="padding:10px 12px;font-size:13px;color:#000000;border-bottom:1px solid #f3f4f6;">
+          ${h.regjeringenUrl
+            ? `<a href="${h.regjeringenUrl}" style="color:#000000;text-decoration:none;">${h.tittel}</a>`
+            : h.tittel}
+          <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${h.departement ?? ''}</div>
+        </td>
+        <td style="padding:10px 12px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${utvalgTekst}</td>
+        <td style="padding:10px 12px;font-size:12px;color:${fristFarge(h.internFrist)};border-bottom:1px solid #f3f4f6;white-space:nowrap;font-weight:500;">${fmtDato(h.internFrist)}</td>
+        <td style="padding:10px 12px;font-size:12px;color:${fristFarge(h.horingsfrist)};border-bottom:1px solid #f3f4f6;white-space:nowrap;font-weight:500;">${fmtDato(h.horingsfrist)}</td>
+        <td style="padding:10px 12px;font-size:11px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">
+          <span style="background:#f3f4f6;color:#6b7280;padding:2px 7px;border-radius:9999px;">${statusLabel(h.status)}</span>
+        </td>
+      </tr>`
+  }).join('')
+
+  const html = plainTemplate(`
+    <p style="font-size:14px;color:#000000;margin:0 0 4px;">Ukens høringsoversikt — <strong>${params.dato}</strong></p>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;">
+      ${params.horinger.length} høring${params.horinger.length !== 1 ? 'er' : ''} er fortsatt til behandling hos utvalgene.
+    </p>
+
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <thead>
+        <tr style="background:#0F1923;">
+          <th style="text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:#fff;text-transform:uppercase;letter-spacing:.04em;">Høring</th>
+          <th style="text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:#fff;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">Utvalg</th>
+          <th style="text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:#fff;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">Intern frist</th>
+          <th style="text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:#fff;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">Høringsfrist</th>
+          <th style="text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:#fff;text-transform:uppercase;letter-spacing:.04em;">Status</th>
+        </tr>
+      </thead>
+      <tbody>${radHtml}</tbody>
     </table>
 
-    ${lenkeHtml}
-    ${vedleggHtml}
-
-    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:16px;">
-      <p style="font-size:13px;color:#374151;margin:0 0 8px;">
-        <strong>Bekreftelse og fristforlengelse:</strong>
-      </p>
-      <p style="font-size:13px;color:#374151;margin:0;">
-        Bekreft til <a href="mailto:${params.avsenderEpost}" style="color:#4A9EDB;">${params.avsenderNavn}</a>
-        om lovutvalget vil sende forslag til høringsuttalelse innen fristen.
-        Meld fra snarest ved behov for fristutsettelse.
-        Dersom lovutvalget mener det ikke er behov for høringsuttalelse, bes det om en kort begrunnelse.
-      </p>
-    </div>
-
-    <details style="margin-bottom:8px;">
-      <summary style="font-size:12px;color:#6b7280;cursor:pointer;font-weight:600;padding:4px 0;">
-        Retningslinjer for utarbeidelse av høringsuttalelser
-      </summary>
-      <div style="margin-top:10px;font-size:12px;color:#6b7280;line-height:1.7;border-left:3px solid #e5e7eb;padding-left:12px;">
-        <p style="margin:0 0 6px;"><strong>Struktur:</strong></p>
-        <ol style="margin:0 0 10px;padding-left:18px;">
-          <li style="margin-bottom:4px;"><em>Innledning:</em> Standard fast innledning legges inn av sekretariatet.</li>
-          <li style="margin-bottom:4px;"><em>Sakens bakgrunn:</em> Beskriv hva høringen gjelder, publiserings- og frister, og hvilke lovutvalg som har utarbeidet uttalelsen.</li>
-          <li style="margin-bottom:4px;"><em>Kommentarer:</em> Følg departementets systematikk. Avslutt gjerne hvert punkt med et standpunkt, f.eks. «Advokatforeningen foreslår…» eller «Advokatforeningen går mot…».</li>
-          <li style="margin-bottom:4px;"><em>Oppsummering:</em> Gjenta hovedsynspunktene avslutningsvis.</li>
-        </ol>
-        <p style="margin:0 0 6px;"><strong>Språk:</strong> Bruk «Advokatforeningen mener…» eller «Etter Advokatforeningens syn…». Unngå «hevder» og «gjør gjeldende». Skriv i foreningens navn — ikke «jeg» eller «vi».</p>
-      </div>
-    </details>
+    <p style="font-size:12px;color:#9ca3af;margin:16px 0 0;">
+      Du mottar denne listen fordi du har abonnert på mandagsoppdateringen i Kontrolltårnet.
+      Du kan endre varslingsinnstillingene dine på <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://tingsyn.no'}/min-side" style="color:#4A9EDB;">Min side</a>.
+    </p>
   `)
 
   return sendEpost({
     to: params.tilEpost,
-    subject: `Høring til behandling: ${params.tittel}`,
+    subject: `Høringsoversikt uke ${ukenummer(new Date())} — ${params.horinger.length} aktive høringer`,
     html,
   })
 }
 
+function ukenummer(d: Date): number {
+  const dato = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  dato.setUTCDate(dato.getUTCDate() + 4 - (dato.getUTCDay() || 7))
+  const årsStart = new Date(Date.UTC(dato.getUTCFullYear(), 0, 1))
+  return Math.ceil((((dato.getTime() - årsStart.getTime()) / 86400000) + 1) / 7)
+}
+
 // ─── Basisfunksjon ──────────────────────────────────────────────────
+
+export async function sendEpostRaw(params: { to: string; subject: string; html: string }) {
+  return sendEpost(params)
+}
 
 async function sendEpost(params: { to: string; subject: string; html: string }) {
   try {
