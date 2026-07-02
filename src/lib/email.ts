@@ -281,7 +281,7 @@ export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; 
     }
     const lead = params.hovedUtvalg ?? params.utvalg[0]
     const andre = params.utvalg.filter(u => u !== lead)
-    const andreTekst = andre.map(u => `lovutvalget for ${liten(u)}`).join(' og ')
+    const andreTekst = andre.map(u => `lovutvalget for <strong>${liten(u)}</strong>`).join(' og ')
     return `<p style="font-size:14px;color:#000000;margin:0 0 14px;">
         Vi ber lovutvalget for <strong>${liten(lead)}</strong> om å utarbeide forslag til foreningens høringsuttalelse i saken.
         Lovutvalget har hovedansvar for å koordinere og sammenstille innspill fra ${antallUtvalg === 2 ? 'begge utvalg' : 'alle utvalg'}, slik at det utarbeides ett samlet forslag til høringsuttalelse.
