@@ -42,8 +42,6 @@ export default function DraggableModal({
     computeLayout()
   }, [computeLayout])
 
-  if (!layout) return null
-
   return (
     <>
       {/* Backdrop */}
@@ -55,30 +53,32 @@ export default function DraggableModal({
 
       {/* Draggable + resizable vindu */}
       <div ref={containerRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: zIndex + 1 }}>
-        <Rnd
-          default={{ x: layout.x, y: layout.y, width: layout.w, height: layout.h }}
-          minWidth={minWidth}
-          minHeight={minHeight}
-          bounds="parent"
-          dragHandleClassName="modal-drag-handle"
-          style={{ pointerEvents: 'auto' }}
-          enableResizing={{
-            top: false, right: false, bottom: true,
-            left: false, topRight: false, bottomRight: true,
-            bottomLeft: false, topLeft: false,
-          }}
-          resizeHandleStyles={{
-            bottom: { height: 8, bottom: -4 },
-            bottomRight: { width: 16, height: 16, right: -4, bottom: -4 },
-          }}
-        >
-          <div
-            className="w-full h-full bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
-            onClick={e => e.stopPropagation()}
+        {layout && (
+          <Rnd
+            default={{ x: layout.x, y: layout.y, width: layout.w, height: layout.h }}
+            minWidth={minWidth}
+            minHeight={minHeight}
+            bounds="parent"
+            dragHandleClassName="modal-drag-handle"
+            style={{ pointerEvents: 'auto' }}
+            enableResizing={{
+              top: false, right: false, bottom: true,
+              left: false, topRight: false, bottomRight: true,
+              bottomLeft: false, topLeft: false,
+            }}
+            resizeHandleStyles={{
+              bottom: { height: 8, bottom: -4 },
+              bottomRight: { width: 16, height: 16, right: -4, bottom: -4 },
+            }}
           >
-            {children}
-          </div>
-        </Rnd>
+            <div
+              className="w-full h-full bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {children}
+            </div>
+          </Rnd>
+        )}
       </div>
     </>
   )
