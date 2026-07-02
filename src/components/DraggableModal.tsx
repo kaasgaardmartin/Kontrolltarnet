@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Rnd } from 'react-rnd'
 
 interface Props {
@@ -22,15 +22,12 @@ export default function DraggableModal({
   minHeight = 300,
   zIndex = 50,
 }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
-  const computeLayout = useCallback(() => {
-    const el = containerRef.current
-    if (!el) return
+  useEffect(() => {
     const pad = 32
-    const vw = el.clientWidth
-    const vh = el.clientHeight
+    const vw = window.innerWidth
+    const vh = window.innerHeight
     const w = Math.min(defaultWidth, vw - pad)
     const h = Math.min(defaultHeight, vh - pad)
     const x = Math.max(pad / 2, Math.round(vw / 2 - w / 2))
@@ -38,9 +35,7 @@ export default function DraggableModal({
     setLayout({ x, y, w, h })
   }, [defaultWidth, defaultHeight])
 
-  useEffect(() => {
-    computeLayout()
-  }, [computeLayout])
+  if (!layout) return null
 
   return (
     <>
@@ -52,33 +47,31 @@ export default function DraggableModal({
       />
 
       {/* Draggable + resizable vindu */}
-      <div ref={containerRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: zIndex + 1 }}>
-        {layout && (
-          <Rnd
-            default={{ x: layout.x, y: layout.y, width: layout.w, height: layout.h }}
-            minWidth={minWidth}
-            minHeight={minHeight}
-            bounds="parent"
-            dragHandleClassName="modal-drag-handle"
-            style={{ pointerEvents: 'auto' }}
-            enableResizing={{
-              top: false, right: false, bottom: true,
-              left: false, topRight: false, bottomRight: true,
-              bottomLeft: false, topLeft: false,
-            }}
-            resizeHandleStyles={{
-              bottom: { height: 8, bottom: -4 },
-              bottomRight: { width: 16, height: 16, right: -4, bottom: -4 },
-            }}
+      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: zIndex + 1 }}>
+        <Rnd
+          default={{ x: layout.x, y: layout.y, width: layout.w, height: layout.h }}
+          minWidth={minWidth}
+          minHeight={minHeight}
+          bounds="parent"
+          dragHandleClassName="modal-drag-handle"
+          style={{ pointerEvents: 'auto' }}
+          enableResizing={{
+            top: false, right: false, bottom: true,
+            left: false, topRight: false, bottomRight: true,
+            bottomLeft: false, topLeft: false,
+          }}
+          resizeHandleStyles={{
+            bottom: { height: 8, bottom: -4 },
+            bottomRight: { width: 16, height: 16, right: -4, bottom: -4 },
+          }}
+        >
+          <div
+            className="w-full h-full bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
           >
-            <div
-              className="w-full h-full bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
-              onClick={e => e.stopPropagation()}
-            >
-              {children}
-            </div>
-          </Rnd>
-        )}
+            {children}
+          </div>
+        </Rnd>
       </div>
     </>
   )
