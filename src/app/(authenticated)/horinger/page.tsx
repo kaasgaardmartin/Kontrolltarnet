@@ -163,14 +163,6 @@ export default function HoringerSide() {
       .map(d => new Date(d!).getFullYear().toString())
   )).sort().reverse()
 
-  const eksportData = (eksportKilde === 'arkiv' ? arkiverteHoringer : sortert)
-    .filter(h => eksportKilde === 'arkiv' || eksportStatuser.has(h.status as Exclude<OffentligHoringStatus, 'arkivert'>))
-    .filter(h => {
-      if (eksportAar === 'alle') return true
-      const dato = h.horingsfrist || h.publisert_dato
-      return dato && new Date(dato).getFullYear().toString() === eksportAar
-    })
-
   function toggleSort(kolonne: SortKolonne) {
     if (sortBy === kolonne) {
       if (sortDir === 'asc') setSortDir('desc')
@@ -216,6 +208,14 @@ export default function HoringerSide() {
           : av > bv ? -1 : 1
       })
     : filtrert
+
+  const eksportData = (eksportKilde === 'arkiv' ? arkiverteHoringer : sortert)
+    .filter(h => eksportKilde === 'arkiv' || eksportStatuser.has(h.status as Exclude<OffentligHoringStatus, 'arkivert'>))
+    .filter(h => {
+      if (eksportAar === 'alle') return true
+      const dato = h.horingsfrist || h.publisert_dato
+      return dato && new Date(dato).getFullYear().toString() === eksportAar
+    })
 
   async function handleArkiver(id: string) {
     setArkivererIds(prev => new Set([...prev, id]))
