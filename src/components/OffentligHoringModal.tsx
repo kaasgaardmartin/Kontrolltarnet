@@ -137,6 +137,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
   const [horingsbrevEdocs, setHoringsbrevEdocs] = useState(horing?.horingsbrev_edocs || '')
   const [horingssvarvEdocs, setHoringssvarvEdocs] = useState(horing?.horingssvar_edocs || '')
   const [oversendelsesbrevEdocs, setOversendelsesbrevEdocs] = useState(horing?.oversendelsesbrev_edocs || '')
+  const [svarPublisertUrl, setSvarPublisertUrl] = useState(horing?.svar_publisert_url || '')
 
   // UI-state
   const [lagrer, setLagrer] = useState(false)
@@ -231,6 +232,7 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
       horingsbrev_edocs: horingsbrevEdocs.trim() || null,
       horingssvar_edocs: horingssvarvEdocs.trim() || null,
       oversendelsesbrev_edocs: oversendelsesbrevEdocs.trim() || null,
+      svar_publisert_url: svarPublisertUrl.trim() || null,
       intern_frist: internFrist || null,
       intern_notat: internNotat || null,
     }
@@ -810,6 +812,35 @@ export default function OffentligHoringModal({ horing, brukere, onLagret, onLukk
                     maxLength={6}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent font-mono tracking-widest"
                   />
+                </div>
+              </div>
+
+              {/* Publisert høringssvar */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                  Lenke til publisert høringssvar
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={svarPublisertUrl}
+                    onChange={e => setSvarPublisertUrl(e.target.value)}
+                    placeholder="https://www.advokatforeningen.no/..."
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                  />
+                  {svarPublisertUrl && (
+                    <a
+                      href={svarPublisertUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 text-sm border border-gray-300 text-[#4A9EDB] rounded-lg hover:bg-blue-50 transition-colors shrink-0 inline-flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                      Åpne
+                    </a>
+                  )}
                 </div>
               </div>
 
