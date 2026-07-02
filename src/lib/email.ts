@@ -312,15 +312,12 @@ export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; 
 
     ${byggUtvalgAvsnitt()}
 
-    ${antallUtvalg > 1 ? `<p style="font-size:14px;color:#000000;margin:-8px 0 14px;">
-      Dette høringsbrevet er også sendt til ${params.utvalg
-        .filter(u => u !== (params.hovedUtvalg ?? params.utvalg[0]))
-        .map(u => `lovutvalget for ${liten(u)}`)
-        .join(' og ')}.
-      Lovutvalget bes sende sine innspill til det koordinerende lovutvalget${params.hovedUtvalg ? ` (lovutvalget for ${liten(params.hovedUtvalg)})` : ''} i god tid før den interne fristen (se nedenfor).
+    ${antallUtvalg > 1 ? `<p style="font-size:14px;color:#000000;margin:0 0 14px;">
+      Dette høringsbrevet er også sendt til ${params.utvalg.map(u => `lovutvalget for ${liten(u)}`).join(', ')}.
+      Lovutvalget bes sende sine innspill til det koordinerende lovutvalget i god tid før den interne fristen (se nedenfor).
     </p>` : ''}
 
-    <p style="font-size:14px;color:#000000;margin:-8px 0 14px;">
+    <p style="font-size:14px;color:#000000;margin:0 0 14px;">
       Dersom det vurderes at høringsbrevet bør forelegges flere lovutvalg, bes det om rask tilbakemelding til sekretariatet.
     </p>
 
