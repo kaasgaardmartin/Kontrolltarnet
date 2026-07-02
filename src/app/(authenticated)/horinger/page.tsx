@@ -142,6 +142,28 @@ export default function HoringerSide() {
   const [arkivererIds, setArkivererIds] = useState<Set<string>>(new Set())
   const [arkiverFeil, setArkiverFeil] = useState<string | null>(null)
   const [eksporterer, setEksporterer] = useState(false)
+  const [visEksportMeny, setVisEksportMeny] = useState(false)
+  const [eksportStatuser, setEksportStatuser] = useState<Set<Exclude<OffentligHoringStatus, 'arkivert'>>>(new Set(ALLE_STATUSER))
+  const eksportMenyRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleKlikk(e: MouseEvent) {
+      if (eksportMenyRef.current && !eksportMenyRef.current.contains(e.target as Node)) {
+        setVisEksportMeny(false)
+      }
+    }
+    if (visEksportMeny) document.addEventListener('mousedown', handleKlikk)
+    return () => document.removeEventListener('mousedown', handleKlikk)
+  }, [visEksportMeny])
+
+  function toggleEksportStatus(s: Exclude<OffentligHoringStatus, 'arkivert'>) {
+    setEksportStatuser(prev => {
+      const neste = new Set(prev)
+      if (neste.has(s)) neste.delete(s)
+      else neste.add(s)
+      return neste
+    })
+  }
 
   function toggleSort(kolonne: SortKolonne) {
     if (sortBy === kolonne) {
@@ -210,7 +232,9 @@ export default function HoringerSide() {
   async function eksporterExcel(kilde: 'aktive' | 'arkiv') {
     setEksporterer(true)
     try {
-    const data = kilde === 'arkiv' ? arkiverteHoringer : sortert
+    const data = kilde === 'arkiv'
+      ? arkiverteHoringer
+      : sortert.filter(h => eksportStatuser.has(h.status as Exclude<OffentligHoringStatus, 'arkivert'>))
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
     wb.creator = 'Kontrolltårnet'
@@ -385,18 +409,70 @@ export default function HoringerSide() {
         </div>
         <div className="flex items-center gap-2">
           {fane === 'aktive' && sortert.length > 0 && (
-            <button
-              onClick={() => eksporterExcel('aktive')}
-              disabled={eksporterer}
-              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
-              title="Eksporter til Excel"
-            >
-              {eksporterer
-                ? <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-              }
-              {eksporterer ? 'Genererer...' : 'Eksporter'}
-            </button>
+            <div className="relative" ref={eksportMenyRef}>
+              <button
+                onClick={() => setVisEksportMeny(v => !v)}
+                disabled={eksporterer}
+                className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
+                title="Eksporter til Excel"
+              >
+                {eksporterer
+                  ? <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                }
+                {eksporterer ? 'Genererer...' : 'Eksporter'}
+                <svg className={`w-3 h-3 transition-transform ${visEksportMeny ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+              {visEksportMeny && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-2">
+                  <p className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">Inkluder statuser</p>
+                  {ALLE_STATUSER.map(s => {
+                    const stil = STATUS_STIL[s]
+                    const valgt = eksportStatuser.has(s)
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => toggleEksportStatus(s)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                      >
+                        <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                          valgt ? 'bg-[#4A9EDB] border-[#4A9EDB]' : 'border-gray-300'
+                        }`}>
+                          {valgt && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className={`w-2 h-2 rounded-full ${stil.dot}`} />
+                        <span className="text-gray-700">{STATUS_LABEL[s]}</span>
+                        <span className="ml-auto text-xs text-gray-400">{teller[s]}</span>
+                      </button>
+                    )
+                  })}
+                  <div className="border-t border-gray-100 mt-1 pt-1 px-3 flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        if (eksportStatuser.size === ALLE_STATUSER.length) setEksportStatuser(new Set())
+                        else setEksportStatuser(new Set(ALLE_STATUSER))
+                      }}
+                      className="text-xs text-[#4A9EDB] hover:underline py-1"
+                    >
+                      {eksportStatuser.size === ALLE_STATUSER.length ? 'Fjern alle' : 'Velg alle'}
+                    </button>
+                    <button
+                      onClick={() => { setVisEksportMeny(false); eksporterExcel('aktive') }}
+                      disabled={eksportStatuser.size === 0}
+                      className="px-3 py-1.5 text-sm bg-[#4A9EDB] text-white rounded-lg hover:bg-[#3a8ecb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Eksporter ({sortert.filter(h => eksportStatuser.has(h.status as Exclude<OffentligHoringStatus, 'arkivert'>)).length})
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           {fane === 'arkiv' && arkiverteHoringer.length > 0 && (
             <button
