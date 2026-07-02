@@ -170,10 +170,16 @@ export default function HoringerSide() {
     return true
   })
 
+  const idagStr = new Date().toISOString().slice(0, 10)
+
   const sortert = sortBy
     ? [...filtrert].sort((a, b) => {
         const av = a[sortBy] ?? ''
         const bv = b[sortBy] ?? ''
+        const aPassert = av !== '' && av < idagStr
+        const bPassert = bv !== '' && bv < idagStr
+        // Passerte frister etter alle aktive
+        if (aPassert !== bPassert) return aPassert ? 1 : -1
         if (av === bv) return 0
         if (av === '') return 1
         if (bv === '') return -1
