@@ -1987,6 +1987,7 @@ export async function genererHoringEpostHtml(horingId: string): Promise<{ html: 
     horingsfrist: h.horingsfrist,
     internFrist: h.intern_frist,
     utvalg: h.utvalg ?? [],
+    hovedUtvalg: h.hoved_utvalg,
     regjeringenUrl: h.regjeringen_url,
     vedlegg: (h.vedlegg ?? []) as { tittel: string; url: string; type: string }[],
   })
