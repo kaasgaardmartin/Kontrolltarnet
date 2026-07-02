@@ -50,12 +50,11 @@ export default function DraggableModal({
         dragHandleClassName="modal-drag-handle"
         style={{ zIndex: zIndex + 1 }}
         enableResizing={{
-          top: false, right: true, bottom: true,
+          top: false, right: false, bottom: true,
           left: false, topRight: false, bottomRight: true,
           bottomLeft: false, topLeft: false,
         }}
         resizeHandleStyles={{
-          right: { width: 8, right: -4 },
           bottom: { height: 8, bottom: -4 },
           bottomRight: { width: 16, height: 16, right: -4, bottom: -4 },
         }}
