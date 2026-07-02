@@ -136,7 +136,7 @@ export default function HoringerSide() {
   const [statusFilter, setStatusFilter] = useState<Exclude<OffentligHoringStatus, 'arkivert'> | 'alle'>('alle')
   const [utvalgFilter, setUtvalgFilter] = useState('')
   const [modalHoring, setModalHoring] = useState<OffentligHoring | null | undefined>(undefined)
-  const [sortBy, setSortBy] = useState<SortKolonne | null>(null)
+  const [sortBy, setSortBy] = useState<SortKolonne | null>('intern_frist')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [bekreftArkiverId, setBekreftArkiverId] = useState<string | null>(null)
   const [arkivererIds, setArkivererIds] = useState<Set<string>>(new Set())
