@@ -279,14 +279,17 @@ export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; 
         Vi ber lovutvalget for <strong>${liten(params.utvalg[0])}</strong> om å se på høringen og eventuelt utarbeide forslag til foreningens høringsuttalelse i saken.
       </p>`
     }
-    // Flere utvalg: setning + punktliste (liten forbokstav i listen også)
-    const listeHtml = params.utvalg
-      .map(u => `<li style="font-size:14px;color:#000000;margin-bottom:3px;">${liten(u)}</li>`)
-      .join('')
-    return `<p style="font-size:14px;color:#000000;margin:0 0 6px;">
-        Vi ber følgende lovutvalg om å se på høringen og eventuelt utarbeide forslag til foreningens høringsuttalelse i saken:
+    const lead = params.hovedUtvalg ?? params.utvalg[0]
+    const andre = params.utvalg.filter(u => u !== lead)
+    const andreTekst = andre.map(u => `lovutvalget for ${liten(u)}`).join(' og ')
+    return `<p style="font-size:14px;color:#000000;margin:0 0 14px;">
+        Vi ber lovutvalget for <strong>${liten(lead)}</strong> om å utarbeide forslag til foreningens høringsuttalelse i saken.
+        Lovutvalget har hovedansvar for å koordinere og sammenstille innspill fra ${antallUtvalg === 2 ? 'begge utvalg' : 'alle utvalg'}, slik at det utarbeides ett samlet forslag til høringsuttalelse.
       </p>
-      <ul style="margin:0 0 14px;padding-left:20px;">${listeHtml}</ul>`
+      <p style="font-size:14px;color:#000000;margin:0 0 14px;">
+        Dette høringsbrevet er også sendt til ${andreTekst}.
+        Lovutvalget bes sende sine innspill til det koordinerende lovutvalget i god tid før den interne fristen (se nedenfor).
+      </p>`
   }
 
   // Lenker og vedlegg som →-piler
@@ -311,11 +314,6 @@ export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; 
     ${pilerHtml ? `<div style="margin:0 0 16px;">${pilerHtml}</div>` : ''}
 
     ${byggUtvalgAvsnitt()}
-
-    ${antallUtvalg > 1 ? `<p style="font-size:14px;color:#000000;margin:0 0 14px;">
-      Dette høringsbrevet er også sendt til ${params.utvalg.map(u => `lovutvalget for ${liten(u)}`).join(', ')}.
-      Lovutvalget bes sende sine innspill til det koordinerende lovutvalget i god tid før den interne fristen (se nedenfor).
-    </p>` : ''}
 
     <p style="font-size:14px;color:#000000;margin:0 0 14px;">
       Dersom det vurderes at høringsbrevet bør forelegges flere lovutvalg, bes det om rask tilbakemelding til sekretariatet.
