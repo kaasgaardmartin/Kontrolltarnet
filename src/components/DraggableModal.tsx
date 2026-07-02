@@ -22,15 +22,20 @@ export default function DraggableModal({
   minHeight = 300,
   zIndex = 50,
 }: Props) {
-  const [initial, setInitial] = useState<{ x: number; y: number } | null>(null)
+  const [layout, setLayout] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   useEffect(() => {
-    const x = Math.max(16, Math.round(window.innerWidth / 2 - defaultWidth / 2))
-    const y = Math.max(16, Math.round(window.innerHeight / 2 - defaultHeight / 2))
-    setInitial({ x, y })
+    const pad = 32
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const w = Math.min(defaultWidth, vw - pad)
+    const h = Math.min(defaultHeight, vh - pad)
+    const x = Math.max(pad / 2, Math.round(vw / 2 - w / 2))
+    const y = Math.max(pad / 2, Math.round(vh / 2 - h / 2))
+    setLayout({ x, y, w, h })
   }, [defaultWidth, defaultHeight])
 
-  if (!initial) return null
+  if (!layout) return null
 
   return (
     <>
@@ -43,7 +48,7 @@ export default function DraggableModal({
 
       {/* Draggable + resizable vindu */}
       <Rnd
-        default={{ x: initial.x, y: initial.y, width: defaultWidth, height: defaultHeight }}
+        default={{ x: layout.x, y: layout.y, width: layout.w, height: layout.h }}
         minWidth={minWidth}
         minHeight={minHeight}
         bounds="window"
