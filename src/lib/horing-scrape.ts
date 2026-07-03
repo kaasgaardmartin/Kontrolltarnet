@@ -99,8 +99,12 @@ function erInstansJunk(tekst: string): boolean {
 
 export async function skrapGenerellSide(url: string): Promise<HoringScrapeResultat> {
   const resp = await fetch(url, {
-    headers: { 'Accept-Language': 'nb-NO,nb;q=0.9', 'User-Agent': 'Mozilla/5.0' },
-    signal: AbortSignal.timeout(10_000),
+    headers: {
+      'Accept-Language': 'nb-NO,nb;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    signal: AbortSignal.timeout(15_000),
   })
   if (!resp.ok) throw new Error(`HTTP ${resp.status} fra ${new URL(url).hostname}`)
   const rawHtml = await resp.text()
@@ -250,8 +254,12 @@ export async function skrapGenerellSide(url: string): Promise<HoringScrapeResult
 // Henter og parser en regjeringen.no høring-side
 export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeResultat> {
   const resp = await fetch(url, {
-    headers: { 'Accept-Language': 'nb-NO,nb;q=0.9', 'User-Agent': 'Mozilla/5.0' },
-    signal: AbortSignal.timeout(10_000),
+    headers: {
+      'Accept-Language': 'nb-NO,nb;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    signal: AbortSignal.timeout(15_000),
   })
   if (!resp.ok) throw new Error(`HTTP ${resp.status} fra regjeringen.no`)
   // Dekod tegn-entiteter (&#248; → ø osv.) på hele HTML-en slik at regex-søk etter æøå fungerer
