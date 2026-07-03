@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn, signUp } from '@/lib/auth'
-// import { signInWithAzure } from '@/lib/auth-azure' // Uncomment for Azure AD
 
 export default function LoginPage() {
   const router = useRouter()
@@ -51,15 +50,6 @@ export default function LoginPage() {
 
     setLoading(false)
   }
-
-  /*
-  // Azure AD login handler - uncomment when switching to Azure AD
-  async function handleAzureLogin() {
-    setError(null)
-    const { error } = await signInWithAzure()
-    if (error) setError(error.message)
-  }
-  */
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA]">
@@ -195,32 +185,6 @@ export default function LoginPage() {
               {loading ? 'Vennligst vent...' : isSignUp ? 'Opprett konto' : 'Logg inn'}
             </button>
           </form>
-
-          {/*
-          // Azure AD button - uncomment when switching to Azure AD
-          <div className="mt-4">
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">eller</span>
-              </div>
-            </div>
-            <button
-              onClick={handleAzureLogin}
-              className="w-full py-2.5 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 21 21">
-                <path fill="#f25022" d="M1 1h9v9H1z"/>
-                <path fill="#00a4ef" d="M1 11h9v9H1z"/>
-                <path fill="#7fba00" d="M11 1h9v9h-9z"/>
-                <path fill="#ffb900" d="M11 11h9v9h-9z"/>
-              </svg>
-              Logg inn med Microsoft
-            </button>
-          </div>
-          */}
 
           <div className="mt-6 text-center">
             <button

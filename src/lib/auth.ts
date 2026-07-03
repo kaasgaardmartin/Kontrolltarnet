@@ -1,12 +1,6 @@
 import { createClient } from './supabase'
 import type { User } from '@supabase/supabase-js'
 
-// ============================================================
-// Active auth provider: Email/Password
-// To switch to Azure AD, comment out the email functions below
-// and uncomment the Azure AD functions in auth-azure.ts
-// ============================================================
-
 export async function signIn(email: string, password: string) {
   const supabase = createClient()
   const { data, error } = await supabase.auth.signInWithPassword({

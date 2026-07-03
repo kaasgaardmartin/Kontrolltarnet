@@ -14,14 +14,6 @@ export type VarselType = 'notat' | 'landing' | 'utfall' | 'aktivitet' | 'frist' 
 export const PARTIER = ['Ap', 'H', 'FrP', 'SV', 'SP', 'V', 'KrF', 'MDG', 'R'] as const
 export type Parti = (typeof PARTIER)[number]
 
-export interface Organisasjon {
-  id: string
-  navn: string
-  domene: string | null
-  logo_url: string | null
-  created_at: string
-}
-
 export interface Bruker {
   id: string
   organisasjon_id: string
@@ -81,13 +73,6 @@ export interface Komite {
 export interface KomiteMandat {
   id: string
   komite_id: string
-  parti: string
-  antall: number
-}
-
-export interface StortingssalenMandat {
-  id: string
-  organisasjon_id: string
   parti: string
   antall: number
 }
