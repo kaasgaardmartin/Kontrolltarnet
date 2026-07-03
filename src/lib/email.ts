@@ -266,7 +266,7 @@ export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; 
   }
 
   const antallUtvalg = params.utvalg.length
-  function liten(s: string) { return s.charAt(0).toLowerCase() + s.slice(1) }
+  function liten(s: string) { if (s.length > 1 && s[1] === s[1].toUpperCase() && s[1] !== s[1].toLowerCase()) return s; return s.charAt(0).toLowerCase() + s.slice(1) }
 
   function byggUtvalgAvsnitt(): string {
     if (antallUtvalg === 0) {
