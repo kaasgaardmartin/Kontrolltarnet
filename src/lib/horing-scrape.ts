@@ -462,13 +462,39 @@ export async function skrapRegjeringenSide(url: string): Promise<HoringScrapeRes
       }
     }
   } else {
-    // Eldre fallback for sider uten factbox-struktur
-    const instansBlock = html.match(/[Hh]øringsinstans[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/)
-    if (instansBlock) {
-      const liMatches = [...instansBlock[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
-      for (const [, li] of liMatches) {
-        const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
-        if (navn && !erInstansJunk(navn)) instanser.push(navn)
+    // Fallback: finn <h2>Høringsinstanser</h2> og hent påfølgende <p>-tagger eller <ul><li>
+    const h2Match = html.match(/<h2[^>]*>\s*[Hh]øringsinstans(?:er|ene)?\s*<\/h2>/i)
+    if (h2Match && h2Match.index !== undefined) {
+      const start = h2Match.index + h2Match[0].length
+      const stopKandidater = [
+        html.indexOf('<h2', start + 1),
+        html.indexOf('</article>', start),
+        html.indexOf('<footer', start),
+      ].filter(i => i !== -1)
+      const stopPos = stopKandidater.length > 0 ? Math.min(...stopKandidater) : start + 15000
+      const blokk = html.substring(start, stopPos)
+
+      const pMatches = [...blokk.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+      for (const [, p] of pMatches) {
+        const navn = renskTekst(p.replace(/<[^>]+>/g, ''))
+        if (navn && navn.length > 2 && !erInstansJunk(navn)) instanser.push(navn)
+      }
+
+      if (instanser.length === 0) {
+        const liMatches = [...blokk.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+        for (const [, li] of liMatches) {
+          const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
+          if (navn && navn.length > 2 && !erInstansJunk(navn)) instanser.push(navn)
+        }
+      }
+    } else {
+      const instansBlock = html.match(/[Hh]øringsinstans[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/)
+      if (instansBlock) {
+        const liMatches = [...instansBlock[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
+        for (const [, li] of liMatches) {
+          const navn = renskTekst(li.replace(/<[^>]+>/g, ''))
+          if (navn && !erInstansJunk(navn)) instanser.push(navn)
+        }
       }
     }
   }
