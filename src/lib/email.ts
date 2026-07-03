@@ -287,7 +287,7 @@ export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; 
         Lovutvalget har hovedansvar for å koordinere og sammenstille innspill fra ${antallUtvalg === 2 ? 'begge utvalg' : 'alle utvalg'}, slik at det utarbeides ett samlet forslag til høringsuttalelse.
       </p>
       <p style="font-size:14px;color:#000000;margin:0 0 14px;">
-        Dette høringsbrevet er også sendt til ${andreTekst}.
+        Denne e-posten er også sendt til ${andreTekst}.
         Lovutvalget bes sende sine innspill til det koordinerende lovutvalget i god tid før den interne fristen (se nedenfor).
       </p>`
   }
@@ -316,7 +316,7 @@ export function byggHoringEpostHtml(params: HoringEpostParams): { html: string; 
     ${byggUtvalgAvsnitt()}
 
     <p style="font-size:14px;color:#000000;margin:0 0 14px;">
-      Dersom det vurderes at høringsbrevet bør forelegges flere lovutvalg, bes det om rask tilbakemelding til sekretariatet.
+      Dersom det vurderes at høringen bør forelegges flere lovutvalg, bes det om rask tilbakemelding til sekretariatet.
     </p>
 
     <p style="font-size:15px;color:#000000;font-weight:600;text-decoration:underline;margin:0 0 16px;">
