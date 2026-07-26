@@ -16,8 +16,10 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Installer tsx
-        run: npm install -g tsx
+      - name: Installer avhengigheter
+        run: |
+          npm ci
+          npm install -g tsx
 
       - name: Kjør rescrape
         env:
