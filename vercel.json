@@ -5,6 +5,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/admin/rescrape-instanser",
+      "schedule": "30 6 * * *"
+    },
+    {
       "path": "/api/cron/fristpaminnelse",
       "schedule": "0 7 * * *"
     }
