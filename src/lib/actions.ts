@@ -2109,6 +2109,76 @@ export async function leggTilOvervaketOrganisasjon(orgnr: string) {
   return { success: true, navn }
 }
 
+export async function bulkLeggTilOrganisasjoner(orgnumre: string[]) {
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget', resultater: [] }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang', resultater: [] }
+
+  const resultater: { orgnr: string; navn: string | null; ok: boolean; feil?: string }[] = []
+
+  for (const raa of orgnumre) {
+    const orgnr = raa.replace(/\s/g, '')
+    if (!/^\d{9}$/.test(orgnr)) {
+      resultater.push({ orgnr, navn: null, ok: false, feil: 'Ugyldig format' })
+      continue
+    }
+
+    try {
+      const resp = await fetch(`${BRREG_BASE}/enheter/${orgnr}`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+      })
+
+      if (!resp.ok) {
+        resultater.push({ orgnr, navn: null, ok: false, feil: resp.status === 404 ? 'Ikke funnet' : `HTTP ${resp.status}` })
+        continue
+      }
+
+      const enhet = await resp.json()
+      const navn = enhet.navn ?? `Org ${orgnr}`
+
+      const supabase = await createServerSupabaseClient()
+      const { data: nyOrg, error } = await supabase
+        .from('overvakede_organisasjoner')
+        .insert({
+          organisasjon_id: bruker.organisasjon_id,
+          orgnr,
+          navn,
+          created_by: bruker.id,
+        })
+        .select('id')
+        .single()
+
+      if (error) {
+        resultater.push({ orgnr, navn, ok: false, feil: error.code === '23505' ? 'Finnes allerede' : error.message })
+        continue
+      }
+
+      try {
+        const rolleResp = await fetch(`${BRREG_BASE}/enheter/${orgnr}/roller`, {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (rolleResp.ok) {
+          const rolleData = await rolleResp.json()
+          const roller = normaliserRoller(rolleData.rollegrupper ?? [])
+          await supabase.from('brreg_roller_snapshot').insert({
+            overvaket_org_id: nyOrg.id,
+            organisasjon_id: bruker.organisasjon_id,
+            roller,
+          })
+        }
+      } catch { /* snapshot on next cron */ }
+
+      resultater.push({ orgnr, navn, ok: true })
+    } catch (err) {
+      resultater.push({ orgnr, navn: null, ok: false, feil: err instanceof Error ? err.message : 'Ukjent feil' })
+    }
+  }
+
+  return { success: true, resultater }
+}
+
 export async function fjernOvervaketOrganisasjon(id: string) {
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return { success: false, error: 'Ikke innlogget' }

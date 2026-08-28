@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useOvervakedeOrganisasjoner, useBrregEndringer, useInvaliderSakData } from '@/lib/queries'
-import { leggTilOvervaketOrganisasjon, fjernOvervaketOrganisasjon } from '@/lib/actions'
+import { leggTilOvervaketOrganisasjon, fjernOvervaketOrganisasjon, bulkLeggTilOrganisasjoner } from '@/lib/actions'
 import type { NormalisertRolle } from '@/lib/brreg'
 
 type Fane = 'oversikt' | 'endringslogg'
@@ -41,15 +41,29 @@ function formaterRelativDato(dato: string): string {
 export default function OrganisasjonerPage() {
   const [fane, setFane] = useState<Fane>('oversikt')
   const [visLeggTil, setVisLeggTil] = useState(false)
+  const [visBulk, setVisBulk] = useState(false)
   const [orgnrInput, setOrgnrInput] = useState('')
   const [leggerTil, setLeggerTil] = useState(false)
   const [feilmelding, setFeilmelding] = useState('')
   const [sletter, setSletter] = useState<string | null>(null)
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
+  const [bulkResultater, setBulkResultater] = useState<{ orgnr: string; navn: string | null; ok: boolean; feil?: string }[] | null>(null)
+  const [bulkLaster, setBulkLaster] = useState(false)
 
   const { data: organisasjoner = [], isLoading } = useOvervakedeOrganisasjoner()
   const { data: endringer = [] } = useBrregEndringer()
   const { invaliderOrganisasjoner } = useInvaliderSakData()
+
+  const SEED_ORGNUMRE = [
+    '916782195','996918122','957423248','919513063','981371593',
+    '984328796','986420177','935597404','994116177','920969798',
+    '913296117','982409705','898783812','988371084','912056880',
+    '947996053','934609255','991341129','925880426','919100265',
+    '981459326','996798577','933326071','885719392','921027583',
+    '916284055','965870016','959704996','817252532','947280740',
+    '982470250','928739317','982370310','926311999','835700402',
+    '992833424','923559841','912879461','991097171','929191811',
+  ]
 
   async function handleLeggTil() {
     setFeilmelding('')
@@ -59,6 +73,19 @@ export default function OrganisasjonerPage() {
     if (res.success) {
       setOrgnrInput('')
       setVisLeggTil(false)
+      invaliderOrganisasjoner()
+    } else {
+      setFeilmelding(res.error ?? 'Noe gikk galt')
+    }
+  }
+
+  async function handleBulkImport() {
+    setBulkLaster(true)
+    setBulkResultater(null)
+    const res = await bulkLeggTilOrganisasjoner(SEED_ORGNUMRE)
+    setBulkLaster(false)
+    if (res.success && res.resultater) {
+      setBulkResultater(res.resultater)
       invaliderOrganisasjoner()
     } else {
       setFeilmelding(res.error ?? 'Noe gikk galt')
@@ -92,12 +119,23 @@ export default function OrganisasjonerPage() {
             Overvåk endringer i styre og ledelse via Brønnøysundregistrene
           </p>
         </div>
-        <button
-          onClick={() => { setVisLeggTil(true); setFeilmelding('') }}
-          className="px-4 py-2 bg-[#4A9EDB] text-white rounded-lg text-sm font-medium hover:bg-[#3a8ecb] transition-colors"
-        >
-          Legg til organisasjon
-        </button>
+        <div className="flex items-center gap-2">
+          {organisasjoner.length === 0 && (
+            <button
+              onClick={() => { setVisBulk(true); setFeilmelding('') }}
+              disabled={bulkLaster}
+              className="px-4 py-2 border border-[#4A9EDB] text-[#4A9EDB] rounded-lg text-sm font-medium hover:bg-[#4A9EDB]/10 disabled:opacity-50 transition-colors"
+            >
+              Importer 40 advokatfirmaer
+            </button>
+          )}
+          <button
+            onClick={() => { setVisLeggTil(true); setFeilmelding('') }}
+            className="px-4 py-2 bg-[#4A9EDB] text-white rounded-lg text-sm font-medium hover:bg-[#3a8ecb] transition-colors"
+          >
+            Legg til organisasjon
+          </button>
+        </div>
       </div>
 
       {/* Add dialog */}
@@ -128,6 +166,76 @@ export default function OrganisasjonerPage() {
               Avbryt
             </button>
           </div>
+          {feilmelding && (
+            <p className="mt-2 text-sm text-red-600">{feilmelding}</p>
+          )}
+        </div>
+      )}
+
+      {/* Bulk import panel */}
+      {visBulk && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-[#0F1923] mb-2">Importer advokatfirmaer</h3>
+          {!bulkResultater ? (
+            <div>
+              <p className="text-sm text-gray-500 mb-4">
+                Legger til 40 norske advokatfirmaer med oppslag mot Brønnøysundregistrene.
+                Dette kan ta et par minutter.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleBulkImport}
+                  disabled={bulkLaster}
+                  className="px-4 py-2 bg-[#4A9EDB] text-white rounded-lg text-sm font-medium hover:bg-[#3a8ecb] disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {bulkLaster && (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {bulkLaster ? 'Importerer...' : 'Start import'}
+                </button>
+                <button
+                  onClick={() => { setVisBulk(false); setBulkResultater(null) }}
+                  disabled={bulkLaster}
+                  className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm disabled:opacity-50 transition-colors"
+                >
+                  Avbryt
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-4 mb-3">
+                <span className="text-sm text-green-600 font-medium">
+                  {bulkResultater.filter(r => r.ok).length} lagt til
+                </span>
+                {bulkResultater.some(r => !r.ok) && (
+                  <span className="text-sm text-red-600 font-medium">
+                    {bulkResultater.filter(r => !r.ok).length} feilet
+                  </span>
+                )}
+              </div>
+              <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-lg">
+                {bulkResultater.map((r, i) => (
+                  <div key={i} className={`px-3 py-2 text-sm flex items-center justify-between ${r.ok ? '' : 'bg-red-50/50'}`}>
+                    <span className={r.ok ? 'text-gray-700' : 'text-red-700'}>
+                      {r.navn ?? r.orgnr}
+                    </span>
+                    {r.ok ? (
+                      <span className="text-green-500 text-xs font-medium">OK</span>
+                    ) : (
+                      <span className="text-red-500 text-xs">{r.feil}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => { setVisBulk(false); setBulkResultater(null) }}
+                className="mt-3 px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
+              >
+                Lukk
+              </button>
+            </div>
+          )}
           {feilmelding && (
             <p className="mt-2 text-sm text-red-600">{feilmelding}</p>
           )}
