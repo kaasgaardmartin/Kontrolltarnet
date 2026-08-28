@@ -1713,6 +1713,7 @@ export interface EpostInnstillinger {
   epost_sakoppdatering: boolean
   epost_horing_til_behandling: boolean
   epost_mandagsliste: boolean
+  epost_organisasjon: boolean
 }
 
 export async function hentEpostInnstillinger(): Promise<EpostInnstillinger | null> {
@@ -1722,7 +1723,7 @@ export async function hentEpostInnstillinger(): Promise<EpostInnstillinger | nul
 
   const { data } = await supabase
     .from('brukere')
-    .select('epost_oppgave_tildelt, epost_fristpaminnelse, epost_horingsfrist, epost_sakoppdatering, epost_horing_til_behandling, epost_mandagsliste')
+    .select('epost_oppgave_tildelt, epost_fristpaminnelse, epost_horingsfrist, epost_sakoppdatering, epost_horing_til_behandling, epost_mandagsliste, epost_organisasjon')
     .eq('id', user.id)
     .single()
 
@@ -1824,7 +1825,7 @@ export async function hentMinBrukerProfil() {
     .select(`
       id, navn, epost, rolle, created_at,
       epost_oppgave_tildelt, epost_fristpaminnelse,
-      epost_horingsfrist, epost_sakoppdatering, epost_horing_til_behandling, epost_mandagsliste,
+      epost_horingsfrist, epost_sakoppdatering, epost_horing_til_behandling, epost_mandagsliste, epost_organisasjon,
       organisasjoner(navn)
     `)
     .eq('id', user.id)

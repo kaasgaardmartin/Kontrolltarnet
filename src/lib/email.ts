@@ -465,6 +465,63 @@ function ukenummer(d: Date): number {
   return Math.ceil((((dato.getTime() - årsStart.getTime()) / 86400000) + 1) / 7)
 }
 
+// ─── Organisasjonsendringer (Brreg) ─────────────────────────────────
+
+export async function sendOrganisasjonsendringEpost(params: {
+  tilEpost: string
+  tilNavn: string
+  endringer: {
+    orgNavn: string
+    orgnr: string
+    beskrivelse: string
+    endringType: string
+  }[]
+}) {
+  const endringRader = params.endringer.map(e => {
+    let farge = '#6b7280'
+    let bakgrunn = '#f9fafb'
+    let ikon = '~'
+    if (e.endringType === 'ny_rolle') { farge = '#15803d'; bakgrunn = '#f0fdf4'; ikon = '+' }
+    else if (e.endringType === 'fjernet_rolle') { farge = '#dc2626'; bakgrunn = '#fef2f2'; ikon = '-' }
+
+    return `
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f3f4f6; width: 24px; vertical-align: top;">
+          <span style="display: inline-block; width: 22px; height: 22px; border-radius: 4px; background: ${bakgrunn}; color: ${farge}; font-weight: 700; font-size: 14px; text-align: center; line-height: 22px; font-family: monospace;">${ikon}</span>
+        </td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f3f4f6;">
+          <div style="font-size: 13px; color: #0F1923;">${e.beskrivelse}</div>
+          <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">${e.orgNavn} · ${e.orgnr}</div>
+        </td>
+      </tr>
+    `
+  }).join('')
+
+  const html = baseTemplate(`
+    <p style="font-size: 14px; color: #374151; margin: 0 0 16px;">
+      Hei ${params.tilNavn},
+    </p>
+    <p style="font-size: 14px; color: #374151; margin: 0 0 16px;">
+      Det er oppdaget <strong>${params.endringer.length} endring${params.endringer.length !== 1 ? 'er' : ''}</strong> i organisasjoner du overvåker:
+    </p>
+    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 16px;">
+      <tbody>
+        ${endringRader}
+      </tbody>
+    </table>
+    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://tingsyn.no'}/organisasjoner"
+       style="display: inline-block; background: #4A9EDB; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 500;">
+      Se organisasjoner
+    </a>
+  `)
+
+  return sendEpost({
+    to: params.tilEpost,
+    subject: `${params.endringer.length} endring${params.endringer.length !== 1 ? 'er' : ''} i overvåkede organisasjoner`,
+    html,
+  })
+}
+
 // ─── Basisfunksjon ──────────────────────────────────────────────────
 
 export async function sendEpostRaw(params: { to: string; subject: string; html: string }) {

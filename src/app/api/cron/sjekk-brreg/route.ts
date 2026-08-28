@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
 
   let antallEndringer = 0
   const feil: string[] = []
+  const endringerPerOrg = new Map<string, { orgNavn: string; orgnr: string; beskrivelse: string; endringType: string }[]>()
 
   for (const org of orgListe) {
     try {
@@ -95,6 +96,12 @@ export async function GET(request: NextRequest) {
           )
         }
 
+        const liste = endringerPerOrg.get(org.organisasjon_id) ?? []
+        for (const e of endringer) {
+          liste.push({ orgNavn: org.navn, orgnr: org.orgnr, beskrivelse: e.beskrivelse, endringType: e.endring_type })
+        }
+        endringerPerOrg.set(org.organisasjon_id, liste)
+
         antallEndringer += endringer.length
         console.log(
           `[cron/sjekk-brreg] ${endringer.length} endring(er) for ${org.navn} (${org.orgnr})`
@@ -117,14 +124,41 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Send e-post til brukere med epost_organisasjon=true
+  let epostSendt = 0
+  if (endringerPerOrg.size > 0) {
+    const { sendOrganisasjonsendringEpost } = await import('@/lib/email')
+
+    for (const [orgId, endringer] of endringerPerOrg) {
+      const { data: brukere } = await supabase
+        .from('brukere')
+        .select('navn, epost')
+        .eq('organisasjon_id', orgId)
+        .eq('aktiv', true)
+        .eq('epost_organisasjon', true)
+
+      for (const bruker of brukere ?? []) {
+        if (!bruker.epost) continue
+        const res = await sendOrganisasjonsendringEpost({
+          tilEpost: bruker.epost,
+          tilNavn: bruker.navn,
+          endringer,
+        })
+        if (res.success) epostSendt++
+        else console.error(`[cron/sjekk-brreg] e-post feilet for ${bruker.epost}:`, res.error)
+      }
+    }
+  }
+
   console.log(
-    `[cron/sjekk-brreg] Ferdig: ${orgListe.length} sjekket, ${antallEndringer} endringer`
+    `[cron/sjekk-brreg] Ferdig: ${orgListe.length} sjekket, ${antallEndringer} endringer, ${epostSendt} e-poster sendt`
   )
 
   return NextResponse.json({
     melding: 'Brreg-sjekk fullført',
     antall_sjekket: orgListe.length,
     antall_endringer: antallEndringer,
+    epost_sendt: epostSendt,
     feil: feil.length > 0 ? feil : undefined,
   })
 }
