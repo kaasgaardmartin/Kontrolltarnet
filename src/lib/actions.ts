@@ -1799,6 +1799,22 @@ export async function sendTestMandagsliste(): Promise<{ success: boolean; antall
   return { success: true, antall: liste.length }
 }
 
+export async function sendTestOrganisasjonsendring(): Promise<{ success: boolean; error?: string }> {
+  const bruker = await hentBrukerOgOrg() as Awaited<ReturnType<typeof hentBrukerOgOrg>> & { epost: string; navn: string } | null
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+
+  const { sendOrganisasjonsendringEpost } = await import('@/lib/email')
+  return sendOrganisasjonsendringEpost({
+    tilEpost: bruker.epost,
+    tilNavn: bruker.navn,
+    endringer: [
+      { orgNavn: 'Wikborg Rein Advokatfirma AS', orgnr: '916782195', beskrivelse: 'Ola Nordmann er ny styrets leder i Wikborg Rein Advokatfirma AS', endringType: 'ny_rolle' },
+      { orgNavn: 'Wikborg Rein Advokatfirma AS', orgnr: '916782195', beskrivelse: 'Kari Hansen er ikke lenger styrets leder i Wikborg Rein Advokatfirma AS', endringType: 'fjernet_rolle' },
+      { orgNavn: 'Thommessen AS', orgnr: '957423248', beskrivelse: 'Per Olsen er ny daglig leder i Thommessen AS', endringType: 'ny_rolle' },
+    ],
+  })
+}
+
 export async function oppdaterEpostInnstillinger(
   innstillinger: Partial<EpostInnstillinger>
 ): Promise<{ success: boolean; error?: string }> {

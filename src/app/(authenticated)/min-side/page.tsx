@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { hentMinBrukerProfil, oppdaterEpostInnstillinger, sendTestMandagsliste } from '@/lib/actions'
+import { hentMinBrukerProfil, oppdaterEpostInnstillinger, sendTestMandagsliste, sendTestOrganisasjonsendring } from '@/lib/actions'
 import type { EpostInnstillinger } from '@/lib/actions'
 
 type Profil = Awaited<ReturnType<typeof hentMinBrukerProfil>>
@@ -187,16 +187,36 @@ export default function MinSidePage() {
           <p className="text-xs text-gray-500 mt-0.5">Velg hvilke hendelser du ønsker e-post om umiddelbart</p>
         </div>
         {HENDELSEVARSLER.map(({ key, label, beskrivelse }) => (
-          <div key={key} className="flex items-center justify-between px-5 py-4 gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-800">{label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{beskrivelse}</p>
+          <div key={key} className="px-5 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-800">{label}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{beskrivelse}</p>
+              </div>
+              <Toggle
+                på={!!(profil[key as keyof typeof profil] as boolean)}
+                lagrer={lagrer === key}
+                onToggle={() => toggle(key)}
+              />
             </div>
-            <Toggle
-              på={!!(profil[key as keyof typeof profil] as boolean)}
-              lagrer={lagrer === key}
-              onToggle={() => toggle(key)}
-            />
+            {key === 'epost_organisasjon' && (
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  onClick={async () => {
+                    setSenderTest(true); setTestStatus(null)
+                    const res = await sendTestOrganisasjonsendring()
+                    setSenderTest(false)
+                    setTestStatus(res.success
+                      ? { type: 'ok', melding: 'Test-e-post sendt!' }
+                      : { type: 'feil', melding: res.error ?? 'Noe gikk galt' })
+                  }}
+                  disabled={senderTest}
+                  className="text-xs px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  {senderTest ? 'Sender…' : 'Send testmail til meg nå'}
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
