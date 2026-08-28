@@ -18,6 +18,8 @@ import {
   hentOffentligeHoringer,
   hentArkiverteHoringer,
   hentOffentligHoring,
+  hentOvervakedeOrganisasjoner,
+  hentBrregEndringer,
 } from './actions'
 
 // ============================================================
@@ -41,6 +43,8 @@ export const queryKeys = {
   offentligeHoringer: ['offentligeHoringer'] as const,
   arkiverteHoringer: ['arkiverteHoringer'] as const,
   offentligHoring: (id: string) => ['offentligHoring', id] as const,
+  overvakedeOrganisasjoner: ['overvakedeOrganisasjoner'] as const,
+  brregEndringer: ['brregEndringer'] as const,
 }
 
 // ============================================================
@@ -182,6 +186,22 @@ export function useOffentligHoring(id: string) {
   })
 }
 
+/** Overvåkede organisasjoner med roller-snapshot */
+export function useOvervakedeOrganisasjoner() {
+  return useQuery({
+    queryKey: queryKeys.overvakedeOrganisasjoner,
+    queryFn: hentOvervakedeOrganisasjoner,
+  })
+}
+
+/** Brreg endringslogg */
+export function useBrregEndringer() {
+  return useQuery({
+    queryKey: queryKeys.brregEndringer,
+    queryFn: () => hentBrregEndringer(),
+  })
+}
+
 // ============================================================
 // Invaliderings-helper
 // ============================================================
@@ -219,6 +239,11 @@ export function useInvaliderSakData() {
       queryClient.invalidateQueries({ queryKey: queryKeys.offentligeHoringer })
       queryClient.invalidateQueries({ queryKey: queryKeys.arkiverteHoringer })
       if (id) queryClient.invalidateQueries({ queryKey: queryKeys.offentligHoring(id) })
+    },
+    /** Invalider overvåkede organisasjoner og endringslogg */
+    invaliderOrganisasjoner: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.overvakedeOrganisasjoner })
+      queryClient.invalidateQueries({ queryKey: queryKeys.brregEndringer })
     },
   }
 }

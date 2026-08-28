@@ -24,6 +24,7 @@ const VARSEL_IKON: Record<VarselType, string> = {
   aktivitet: '📋',
   frist: '⏰',
   tildelt: '👤',
+  organisasjon: '🏢',
 }
 
 function tidSiden(dato: string): string {
@@ -121,6 +122,7 @@ export default function Toppmeny() {
     { href: '/', label: 'Stortinget' },
     { href: '/horinger', label: 'Høringer' },
     { href: '/mine-oppgaver', label: 'Mine oppgaver' },
+    { href: '/organisasjoner', label: 'Organisasjoner' },
     { href: '/admin', label: 'Komiteer' },
     ...(erOrgAdmin ? [{ href: '/admin/brukere', label: 'Brukere' }] : []),
     ...(erOrgAdmin ? [{ href: '/admin/lovutvalg', label: 'Lovutvalg' }] : []),

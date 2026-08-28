@@ -9,7 +9,7 @@ export type Holdning = 'for' | 'mot' | 'nøytral' | 'ukjent'
 export type Innflytelse = 'høy' | 'middels' | 'lav'
 export type AktivitetType = 'møte' | 'telefon' | 'e-post' | 'sosiale medier' | 'publisering' | 'annet'
 export type AktivitetStatus = 'planlagt' | 'utført' | 'avlyst'
-export type VarselType = 'notat' | 'landing' | 'utfall' | 'aktivitet' | 'frist' | 'tildelt'
+export type VarselType = 'notat' | 'landing' | 'utfall' | 'aktivitet' | 'frist' | 'tildelt' | 'organisasjon'
 
 export const PARTIER = ['Ap', 'H', 'FrP', 'SV', 'SP', 'V', 'KrF', 'MDG', 'R'] as const
 export type Parti = (typeof PARTIER)[number]

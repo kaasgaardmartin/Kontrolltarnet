@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerSupabaseClient } from './supabase-server'
+import { BRREG_BASE, normaliserRoller } from './brreg'
 
 import type { Sak, PartiStemme, Stemme, Niva, Landing, Notat, Lenke, LenkeType, Komite, KomiteMandat, Rolle, Bruker, Stakeholder, SakStakeholder, Aktivitet, StakeholderType, Holdning, Innflytelse, AktivitetType, AktivitetStatus, Varsel, VarselType } from './types'
 
@@ -2008,4 +2009,118 @@ export async function sendHoringEpostTilMedlemmer(params: {
     else feilet++
   }
   return { success: true, sendt, feilet }
+}
+
+// ============================================================
+// Organisasjonsovervåking (Brreg)
+// ============================================================
+
+export async function hentOvervakedeOrganisasjoner() {
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('overvakede_organisasjoner')
+    .select(`
+      *,
+      brreg_roller_snapshot(roller, hentet_dato),
+      brukere!created_by(navn)
+    `)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .order('navn')
+
+  return data ?? []
+}
+
+export async function hentBrregEndringer(grense = 50) {
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('brreg_endringer')
+    .select('*')
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .order('oppdaget_dato', { ascending: false })
+    .limit(grense)
+
+  return data ?? []
+}
+
+export async function leggTilOvervaketOrganisasjon(orgnr: string) {
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const renset = orgnr.replace(/\s/g, '')
+  if (!/^\d{9}$/.test(renset)) return { success: false, error: 'Organisasjonsnummer må være 9 siffer' }
+
+  const resp = await fetch(`${BRREG_BASE}/enheter/${renset}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
+  })
+
+  if (!resp.ok) {
+    if (resp.status === 404) return { success: false, error: 'Organisasjonsnummer ikke funnet i Brreg' }
+    return { success: false, error: `Brreg-oppslag feilet (HTTP ${resp.status})` }
+  }
+
+  const enhet = await resp.json()
+  const navn = enhet.navn ?? `Org ${renset}`
+
+  const supabase = await createServerSupabaseClient()
+  const { data: nyOrg, error } = await supabase
+    .from('overvakede_organisasjoner')
+    .insert({
+      organisasjon_id: bruker.organisasjon_id,
+      orgnr: renset,
+      navn,
+      created_by: bruker.id,
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') return { success: false, error: 'Organisasjonen overvåkes allerede' }
+    return { success: false, error: error.message }
+  }
+
+  try {
+    const rolleResp = await fetch(`${BRREG_BASE}/enheter/${renset}/roller`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+    })
+
+    if (rolleResp.ok) {
+      const rolleData = await rolleResp.json()
+      const roller = normaliserRoller(rolleData.rollegrupper ?? [])
+
+      await supabase.from('brreg_roller_snapshot').insert({
+        overvaket_org_id: nyOrg.id,
+        organisasjon_id: bruker.organisasjon_id,
+        roller,
+      })
+    }
+  } catch {
+    // Initial snapshot populated on next cron run
+  }
+
+  return { success: true, navn }
+}
+
+export async function fjernOvervaketOrganisasjon(id: string) {
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle !== 'org-admin') return { success: false, error: 'Kun org-admin kan fjerne organisasjoner' }
+
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase
+    .from('overvakede_organisasjoner')
+    .delete()
+    .eq('id', id)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
 }
