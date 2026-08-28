@@ -38,6 +38,11 @@ const HENDELSEVARSLER: { key: keyof EpostInnstillinger; label: string; beskrivel
     label: 'Saksoppdateringer',
     beskrivelse: 'Når det skjer endringer på saker du følger',
   },
+  {
+    key: 'epost_organisasjon',
+    label: 'Organisasjonsendringer',
+    beskrivelse: 'Når det oppdages endringer i styre eller ledelse i overvåkede organisasjoner',
+  },
 ]
 
 function Toggle({
