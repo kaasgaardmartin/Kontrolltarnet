@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/fristpaminnelse",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/sjekk-brreg",
+      "schedule": "0 8 * * *"
     }
   ]
 }
