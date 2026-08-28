@@ -6,8 +6,11 @@ export interface BrregRolleType {
 }
 
 export interface BrregPerson {
-  fornavn: string
-  etternavn: string
+  navn?: {
+    fornavn?: string
+    mellomnavn?: string
+    etternavn?: string
+  }
   fodselsdato?: string
 }
 
@@ -35,11 +38,14 @@ export function normaliserRoller(rollegrupper: BrregRollegruppe[]): NormalisertR
   for (const gruppe of rollegrupper) {
     if (!gruppe.roller) continue
     for (const rolle of gruppe.roller) {
-      if (rolle.person) {
+      if (rolle.person?.navn) {
+        const n = rolle.person.navn
+        const deler = [n.fornavn, n.mellomnavn, n.etternavn].filter(Boolean)
+        if (deler.length === 0) continue
         result.push({
           rollegruppe: gruppe.type.beskrivelse,
           rolletype: rolle.type.beskrivelse,
-          personnavn: `${rolle.person.fornavn} ${rolle.person.etternavn}`,
+          personnavn: deler.join(' '),
           fratraadt: rolle.fratraadt,
         })
       }
