@@ -131,10 +131,7 @@ export default function Toppmeny() {
     { href: '/', label: 'Stortinget' },
     { href: '/horinger', label: 'Høringer' },
     { href: '/mine-oppgaver', label: 'Mine oppgaver' },
-    { href: '/organisasjoner', label: 'Organisasjoner' },
-    { href: '/admin', label: 'Komiteer' },
-    ...(erOrgAdmin ? [{ href: '/admin/brukere', label: 'Brukere' }] : []),
-    ...(erOrgAdmin ? [{ href: '/admin/lovutvalg', label: 'Lovutvalg' }] : []),
+    { href: '/organisasjoner', label: 'Bransjen' },
   ]
 
   return (
@@ -305,6 +302,15 @@ export default function Toppmeny() {
                   >
                     Min side
                   </Link>
+                  {erOrgAdmin && (
+                    <Link
+                      href="/innstillinger"
+                      onClick={() => setShowProfile(false)}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Innstillinger
+                    </Link>
+                  )}
                   <button
                     onClick={handleSignOut}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
