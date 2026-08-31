@@ -113,7 +113,7 @@ export async function hentBrukerOgOrg() {
             organisasjon_id: org.id,
             navn,
             epost: user.email,
-            rolle: 'redaktør',
+            rolle: 'leser',
           })
           .select('id, organisasjon_id, rolle, navn')
           .single()
@@ -2050,6 +2050,17 @@ export async function genererHoringEpostHtml(horingId: string): Promise<{ html: 
   return { ...result, avsenderNavn: avsender.navn, avsenderEpost: avsender.epost }
 }
 
+function sanitizeEmailHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object\b[^>]*>[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed\b[^>]*\/?>/gi, '')
+    .replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, '')
+    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
+}
+
 export async function sendHoringEpostTilMedlemmer(params: {
   mottakere: { navn: string; epost: string }[]
   subject: string
@@ -2057,9 +2068,10 @@ export async function sendHoringEpostTilMedlemmer(params: {
 }): Promise<{ success: boolean; sendt: number; feilet: number; error?: string }> {
   if (params.mottakere.length === 0) return { success: false, sendt: 0, feilet: 0, error: 'Ingen mottakere valgt' }
   const { sendEpostRaw } = await import('@/lib/email')
+  const safeHtml = sanitizeEmailHtml(params.html)
   let sendt = 0, feilet = 0
   for (const m of params.mottakere) {
-    const res = await sendEpostRaw({ to: m.epost, subject: params.subject, html: params.html })
+    const res = await sendEpostRaw({ to: m.epost, subject: params.subject, html: safeHtml })
     if (res.success) sendt++
     else feilet++
   }

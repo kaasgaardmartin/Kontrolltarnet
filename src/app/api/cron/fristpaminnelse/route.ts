@@ -75,9 +75,12 @@ async function sendMandagsliste(supabase: ReturnType<typeof createClient<any>>) 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronSecret) {
+    console.error('[cron/fristpaminnelse] CRON_SECRET er ikke satt')
+    return NextResponse.json({ error: 'Server-konfigurasjonsfeil' }, { status: 500 })
+  }
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Ikke autorisert' }, { status: 401 })
   }
 
   const resultat: Record<string, unknown> = {
