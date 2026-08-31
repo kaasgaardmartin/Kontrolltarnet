@@ -44,8 +44,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Server-side admin-sjekk for /admin-ruter
-  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+  // Server-side admin-sjekk for /innstillinger-ruter
+  if (user && request.nextUrl.pathname.startsWith('/innstillinger')) {
     const { data: bruker } = await supabase
       .from('brukere')
       .select('rolle')

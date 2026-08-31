@@ -77,20 +77,17 @@ export default function BrukereAdminPage() {
 
   if (laster) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-48" />
-          <div className="h-64 bg-gray-200 rounded" />
-        </div>
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 rounded w-48" />
+        <div className="h-64 bg-gray-200 rounded" />
       </div>
     )
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Brukere</h1>
-        <p className="text-sm text-gray-500 mt-1">
+    <div>
+      <div className="mb-4">
+        <p className="text-sm text-gray-500">
           Administrer brukere i organisasjonen. Nye brukere med @advokatforeningen.no-epost
           får automatisk tilgang som redaktør.
         </p>

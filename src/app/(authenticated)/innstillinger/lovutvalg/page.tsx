@@ -57,9 +57,7 @@ export default function LovutvalgAdminPage() {
   if (laster) return <div className="p-6 text-sm text-gray-400">Laster…</div>
 
   return (
-    <div className="max-w-3xl mx-auto py-6 space-y-6">
-      <h1 className="text-xl font-semibold text-gray-900">Lovutvalg og medlemmer</h1>
-
+    <div className="space-y-6">
       {/* Opprett nytt utvalg */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <p className="text-sm font-medium text-gray-700 mb-3">Opprett nytt utvalg</p>
