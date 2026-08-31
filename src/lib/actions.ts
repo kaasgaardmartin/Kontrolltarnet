@@ -458,6 +458,7 @@ export async function slettSak(sakId: string): Promise<{ success: boolean; error
     .from('saker')
     .delete()
     .eq('id', sakId)
+    .eq('organisasjon_id', bruker.organisasjon_id)
 
   if (error) return { success: false, error: error.message }
   return { success: true }
@@ -590,6 +591,12 @@ export async function slettLenke(lenkeId: string): Promise<{ success: boolean; e
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  const { data: lenke } = await supabase.from('lenker').select('sak_id').eq('id', lenkeId).single()
+  if (!lenke) return { success: false, error: 'Ikke funnet' }
+
+  const { data: sak } = await supabase.from('saker').select('id').eq('id', lenke.sak_id).eq('organisasjon_id', bruker.organisasjon_id).single()
+  if (!sak) return { success: false, error: 'Ingen tilgang' }
+
   const { error } = await supabase.from('lenker').delete().eq('id', lenkeId)
   if (error) return { success: false, error: error.message }
   return { success: true }
@@ -605,6 +612,7 @@ export async function endreSakNiva(sakId: string, niva: 'storting' | 'departemen
     .from('saker')
     .update({ niva })
     .eq('id', sakId)
+    .eq('organisasjon_id', bruker.organisasjon_id)
 
   if (error) return { success: false, error: error.message }
   return { success: true }
@@ -750,7 +758,7 @@ export async function oppdaterKomite(komiteId: string, navn: string): Promise<{ 
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
-  const { error } = await supabase.from('komiteer').update({ navn }).eq('id', komiteId)
+  const { error } = await supabase.from('komiteer').update({ navn }).eq('id', komiteId).eq('organisasjon_id', bruker.organisasjon_id)
   if (error) return { success: false, error: error.message }
   return { success: true }
 }
@@ -761,7 +769,7 @@ export async function slettKomite(komiteId: string): Promise<{ success: boolean;
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle !== 'org-admin') return { success: false, error: 'Kun org-admin kan slette komiteer' }
 
-  const { error } = await supabase.from('komiteer').delete().eq('id', komiteId)
+  const { error } = await supabase.from('komiteer').delete().eq('id', komiteId).eq('organisasjon_id', bruker.organisasjon_id)
   if (error) return { success: false, error: error.message }
   return { success: true }
 }
@@ -774,6 +782,9 @@ export async function oppdaterKomiteMandater(
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { data: komite } = await supabase.from('komiteer').select('id').eq('id', komiteId).eq('organisasjon_id', bruker.organisasjon_id).single()
+  if (!komite) return { success: false, error: 'Ingen tilgang' }
 
   for (const m of mandater) {
     await supabase
@@ -872,6 +883,12 @@ export async function slettHoring(horingId: string): Promise<{ success: boolean;
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { data: horing } = await supabase.from('horinger').select('sak_id').eq('id', horingId).single()
+  if (!horing) return { success: false, error: 'Ikke funnet' }
+
+  const { data: sak } = await supabase.from('saker').select('id').eq('id', horing.sak_id).eq('organisasjon_id', bruker.organisasjon_id).single()
+  if (!sak) return { success: false, error: 'Ingen tilgang' }
 
   const { error } = await supabase.from('horinger').delete().eq('id', horingId)
   if (error) return { success: false, error: error.message }
@@ -1037,6 +1054,12 @@ export async function fjernSakStakeholder(id: string): Promise<{ success: boolea
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
+  const { data: stakeholder } = await supabase.from('sak_stakeholders').select('sak_id').eq('id', id).single()
+  if (!stakeholder) return { success: false, error: 'Ikke funnet' }
+
+  const { data: sak } = await supabase.from('saker').select('id').eq('id', stakeholder.sak_id).eq('organisasjon_id', bruker.organisasjon_id).single()
+  if (!sak) return { success: false, error: 'Ingen tilgang' }
+
   const { error } = await supabase.from('sak_stakeholders').delete().eq('id', id)
   if (error) return { success: false, error: error.message }
   return { success: true }
@@ -1199,14 +1222,16 @@ export async function slettAktivitet(aktivitetId: string): Promise<{ success: bo
   if (!bruker) return { success: false, error: 'Ikke innlogget' }
   if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
 
-  // Fetch info before deleting (for notification)
   const { data: aktivitet } = await supabase
     .from('aktiviteter')
     .select('sak_id, beskrivelse')
     .eq('id', aktivitetId)
     .single()
+  if (!aktivitet) return { success: false, error: 'Ikke funnet' }
 
-  // Delete activity — CASCADE on varsler.aktivitet_id removes related notifications automatically
+  const { data: sak } = await supabase.from('saker').select('id').eq('id', aktivitet.sak_id).eq('organisasjon_id', bruker.organisasjon_id).single()
+  if (!sak) return { success: false, error: 'Ingen tilgang' }
+
   const { error } = await supabase.from('aktiviteter').delete().eq('id', aktivitetId)
   if (error) return { success: false, error: error.message }
 
@@ -1917,7 +1942,11 @@ export async function opprettLovutvalg(navn: string): Promise<{ success: boolean
 
 export async function slettLovutvalg(id: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('lovutvalg').delete().eq('id', id)
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle !== 'org-admin') return { success: false, error: 'Kun org-admin kan slette utvalg' }
+
+  const { error } = await supabase.from('lovutvalg').delete().eq('id', id).eq('organisasjon_id', bruker.organisasjon_id)
   if (error) return { success: false, error: error.message }
   return { success: true }
 }
@@ -1940,6 +1969,15 @@ export async function leggTilMedlem(
 
 export async function slettMedlem(id: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+
+  const { data: medlem } = await supabase.from('lovutvalg_medlemmer').select('lovutvalg_id').eq('id', id).single()
+  if (!medlem) return { success: false, error: 'Ikke funnet' }
+
+  const { data: utvalg } = await supabase.from('lovutvalg').select('id').eq('id', medlem.lovutvalg_id).eq('organisasjon_id', bruker.organisasjon_id).single()
+  if (!utvalg) return { success: false, error: 'Ingen tilgang' }
+
   const { error } = await supabase.from('lovutvalg_medlemmer').delete().eq('id', id)
   if (error) return { success: false, error: error.message }
   return { success: true }
