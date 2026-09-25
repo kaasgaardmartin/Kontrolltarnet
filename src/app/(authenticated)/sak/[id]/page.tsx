@@ -33,6 +33,7 @@ const NIVA_LABEL: Record<string, string> = {
   storting: 'Storting',
   departement: 'Departement',
   intern: 'Intern',
+  'påvirkning': 'Påvirkning',
 }
 
 function getDomainFromUrl(url: string): string {
@@ -147,6 +148,8 @@ export default function SakDetaljSide() {
         onClick={() => {
           if (sak.forelder_id) {
             router.push(`/sak/${sak.forelder_id}`)
+          } else if (sak.niva === 'påvirkning') {
+            router.push('/pavirkningssaker')
           } else {
             router.push('/')
           }
@@ -175,6 +178,9 @@ export default function SakDetaljSide() {
             </span>
             {sak.komiteer && (
               <span className="text-xs text-gray-400">{sak.komiteer.navn}</span>
+            )}
+            {sak.fase && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">{sak.fase}</span>
             )}
             {sak.sesjon && (
               <span className="text-xs text-gray-400">{sak.sesjon}</span>
@@ -244,6 +250,14 @@ export default function SakDetaljSide() {
       {sak.beskrivelse && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{sak.beskrivelse}</p>
+        </div>
+      )}
+
+      {/* Målsetting (påvirkningssaker) */}
+      {sak.malsetting && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+          <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Målsetting</h3>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{sak.malsetting}</p>
         </div>
       )}
 

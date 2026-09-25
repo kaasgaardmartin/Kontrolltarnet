@@ -75,6 +75,8 @@ export interface SakFormData {
   horingsfrist?: string | null
   horingsnotat_url?: string | null
   horingssvar_url?: string | null
+  fase?: string | null
+  malsetting?: string | null
   stemmer: { parti: string; stemme: Stemme }[]
 }
 
@@ -137,6 +139,7 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
     .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn)), aktiviteter(frist, status), horinger(innspillsfrist, anmodningsfrist, start_dato, status, skriftlig)')
     .eq('organisasjon_id', bruker.organisasjon_id)
     .eq('arkivert', false)
+    .neq('niva', 'påvirkning')
     .order('updated_at', { ascending: false })
 
   const nå = new Date()
@@ -214,6 +217,49 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
   const delsaker = saker.filter(s => s.forelder_id)
 
   // Nest delsaker under their parent
+  for (const hovedsak of hovedsaker) {
+    hovedsak.delsaker = delsaker.filter(d => d.forelder_id === hovedsak.id)
+  }
+
+  return hovedsaker
+}
+
+export async function hentPavirkningssaker(): Promise<SakMedStemmer[]> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return []
+
+  const { data: alleSaker } = await supabase
+    .from('saker')
+    .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn)), aktiviteter(frist, status)')
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .eq('niva', 'påvirkning')
+    .eq('arkivert', false)
+    .order('updated_at', { ascending: false })
+
+  const saker = (alleSaker ?? []).map((s: Record<string, unknown>) => {
+    const sakStakeholders = (s.sak_stakeholders ?? []) as { stakeholders: { navn: string } | null }[]
+    const stakeholder_navn = sakStakeholders
+      .map(ss => ss.stakeholders?.navn)
+      .filter((n): n is string => !!n)
+
+    const aktiviteter = (s.aktiviteter ?? []) as { frist: string | null; status: string }[]
+    const planlagte = aktiviteter.filter(a => a.status === 'planlagt')
+    const frister = planlagte
+      .map(a => a.frist)
+      .filter((f): f is string => !!f)
+      .sort()
+    const aktivitet_oppsummering: AktivitetOppsummering = {
+      antallPlanlagte: planlagte.length,
+      nesteFrist: frister.length > 0 ? frister[0] : null,
+    }
+
+    const { sak_stakeholders: _ss, aktiviteter: _ak, ...rest } = s
+    return { ...rest, stakeholder_navn, aktivitet_oppsummering } as SakMedStemmer
+  })
+
+  const hovedsaker = saker.filter(s => !s.forelder_id)
+  const delsaker = saker.filter(s => s.forelder_id)
   for (const hovedsak of hovedsaker) {
     hovedsak.delsaker = delsaker.filter(d => d.forelder_id === hovedsak.id)
   }
@@ -317,6 +363,8 @@ export async function opprettSak(formData: SakFormData): Promise<{ success: bool
       horingsfrist: formData.horingsfrist || null,
       horingsnotat_url: formData.horingsnotat_url || null,
       horingssvar_url: formData.horingssvar_url || null,
+      fase: formData.fase || null,
+      malsetting: formData.malsetting || null,
       created_by: bruker.id,
       eier_id: bruker.id,
     })
@@ -377,6 +425,8 @@ export async function oppdaterSak(sakId: string, formData: SakFormData): Promise
       horingsfrist: formData.horingsfrist || null,
       horingsnotat_url: formData.horingsnotat_url || null,
       horingssvar_url: formData.horingssvar_url || null,
+      fase: formData.fase || null,
+      malsetting: formData.malsetting || null,
     })
     .eq('id', sakId)
 
@@ -602,7 +652,7 @@ export async function slettLenke(lenkeId: string): Promise<{ success: boolean; e
   return { success: true }
 }
 
-export async function endreSakNiva(sakId: string, niva: 'storting' | 'departement' | 'intern'): Promise<{ success: boolean; error?: string }> {
+export async function endreSakNiva(sakId: string, niva: Niva): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()
   const bruker = await hentBrukerOgOrg()
   if (!bruker) return { success: false, error: 'Ikke innlogget' }

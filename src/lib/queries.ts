@@ -20,6 +20,7 @@ import {
   hentOffentligHoring,
   hentOvervakedeOrganisasjoner,
   hentBrregEndringer,
+  hentPavirkningssaker,
 } from './actions'
 
 // ============================================================
@@ -28,6 +29,7 @@ import {
 
 export const queryKeys = {
   saker: ['saker'] as const,
+  pavirkningssaker: ['pavirkningssaker'] as const,
   arkiverteSaker: ['arkiverteSaker'] as const,
   mandater: ['stortingsmandater'] as const,
   komiteer: ['komiteer'] as const,
@@ -56,6 +58,14 @@ export function useSaker() {
   return useQuery({
     queryKey: queryKeys.saker,
     queryFn: hentSakerMedStemmer,
+  })
+}
+
+/** Påvirkningssaker */
+export function usePavirkningssaker() {
+  return useQuery({
+    queryKey: queryKeys.pavirkningssaker,
+    queryFn: hentPavirkningssaker,
   })
 }
 
@@ -215,6 +225,7 @@ export function useInvaliderSakData() {
     invaliderSaker: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.saker })
       queryClient.invalidateQueries({ queryKey: queryKeys.arkiverteSaker })
+      queryClient.invalidateQueries({ queryKey: queryKeys.pavirkningssaker })
       queryClient.invalidateQueries({ queryKey: queryKeys.kommendeAktiviteter })
       queryClient.invalidateQueries({ queryKey: queryKeys.mineAktiviteter })
     },

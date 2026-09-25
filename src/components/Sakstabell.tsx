@@ -51,6 +51,7 @@ const NIVA_LABEL: Record<string, string> = {
   storting: 'Storting',
   departement: 'Dept.',
   intern: 'Intern',
+  'påvirkning': 'Påvirkning',
 }
 
 function getStemme(sak: SakMedStemmer, parti: string): Stemme {

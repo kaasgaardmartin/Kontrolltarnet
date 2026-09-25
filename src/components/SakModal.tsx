@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PARTIER, type Stemme, type Niva, type Landing } from '@/lib/types'
+import { PARTIER, STANDARD_FASER, type Stemme, type Niva, type Landing } from '@/lib/types'
 import { opprettSak, oppdaterSak, slettSak, type SakFormData, type SakMedStemmer } from '@/lib/actions'
 import type { StortingetSak } from '@/app/api/stortinget/route'
 import DraggableModal from '@/components/DraggableModal'
@@ -26,6 +26,7 @@ interface Props {
   forelderId?: string | null  // for creating delsak
   forelderData?: ForelderData | null  // parent data for pre-filling
   importertStortingetSak?: StortingetSak | null  // data fra Stortinget-import
+  defaultNiva?: Niva
   onLagret: (sakId?: string) => void
   onLukk: () => void
 }
@@ -34,6 +35,7 @@ const NIVA_OPTIONS: { value: Niva; label: string }[] = [
   { value: 'storting', label: 'Storting' },
   { value: 'departement', label: 'Departement' },
   { value: 'intern', label: 'Intern' },
+  { value: 'påvirkning', label: 'Påvirkning' },
 ]
 
 const LANDING_OPTIONS: { value: Landing; label: string }[] = [
@@ -56,7 +58,7 @@ function getStemmeForParti(sak: SakMedStemmer | null, parti: string): Stemme {
   return (found?.stemme as Stemme) || 'ukjent'
 }
 
-export default function SakModal({ sak, komiteer, forelderId, forelderData, importertStortingetSak, onLagret, onLukk }: Props) {
+export default function SakModal({ sak, komiteer, forelderId, forelderData, importertStortingetSak, defaultNiva, onLagret, onLukk }: Props) {
   const erNy = !sak
   const fd = forelderData // shorthand for parent defaults
   const imp = importertStortingetSak // shorthand for import data
@@ -68,7 +70,7 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
 
   const [tittel, setTittel] = useState(sak?.tittel ?? imp?.korttittel ?? imp?.tittel ?? '')
   const [beskrivelse, setBeskrivelse] = useState(sak?.beskrivelse ?? (imp ? imp.tittel : '') ?? '')
-  const [niva, setNiva] = useState<Niva | ''>(sak?.niva ?? (fd?.niva as Niva) ?? (imp ? 'storting' : ''))
+  const [niva, setNiva] = useState<Niva | ''>(sak?.niva ?? (fd?.niva as Niva) ?? (imp ? 'storting' : defaultNiva ?? ''))
   const [landing, setLanding] = useState<Landing>(sak?.landing ?? 'ukjent')
   const [komiteId, setKomiteId] = useState(sak?.komite_id ?? fd?.komite_id ?? importKomiteId)
   const [stortingssakRef, setStortingssakRef] = useState(
@@ -84,6 +86,8 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
     }
     return initial
   })
+  const [fase, setFase] = useState(sak?.fase ?? '')
+  const [malsetting, setMalsetting] = useState(sak?.malsetting ?? '')
   const [horingsfrist, setHoringsfrist] = useState(sak?.horingsfrist ?? '')
   const [horingsnotatUrl, setHoringsnotatUrl] = useState(sak?.horingsnotat_url ?? '')
   const [horingssvarUrl, setHoringssvarUrl] = useState(sak?.horingssvar_url ?? '')
@@ -124,6 +128,8 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
       horingsfrist: horingsfrist || null,
       horingsnotat_url: horingsnotatUrl.trim() || null,
       horingssvar_url: horingssvarUrl.trim() || null,
+      fase: fase.trim() || null,
+      malsetting: malsetting.trim() || null,
       stemmer: PARTIER.map(p => ({ parti: p, stemme: stemmer[p] })),
     }
 
@@ -241,74 +247,111 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
             </div>
           </div>
 
-          {/* Komité + Stortingsref */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Komité</label>
-              <select
-                value={komiteId}
-                onChange={e => setKomiteId(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent bg-white"
-              >
-                <option value="">Ingen komité</option>
-                {komiteer.map(k => (
-                  <option key={k.id} value={k.id}>{k.navn}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Saksreferanse (lenke)</label>
-              <div className="relative">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.28" />
-                </svg>
+          {niva === 'påvirkning' && (
+            <>
+              {/* Fase */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fase</label>
                 <input
-                  type="url"
-                  value={stortingssakRef}
-                  onChange={e => setStortingssakRef(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
-                  placeholder="https://www.stortinget.no/..."
+                  type="text"
+                  list="standard-faser"
+                  value={fase}
+                  onChange={e => setFase(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                  placeholder="Velg eller skriv inn fase"
+                />
+                <datalist id="standard-faser">
+                  {STANDARD_FASER.map(f => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
+              </div>
+              {/* Målsetting */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Målsetting</label>
+                <textarea
+                  value={malsetting}
+                  onChange={e => setMalsetting(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent resize-none"
+                  placeholder="Hva ønsker organisasjonen å oppnå?"
+                />
+              </div>
+            </>
+          )}
+
+          {niva !== 'påvirkning' && (
+            <>
+              {/* Komité + Stortingsref */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Komité</label>
+                  <select
+                    value={komiteId}
+                    onChange={e => setKomiteId(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent bg-white"
+                  >
+                    <option value="">Ingen komité</option>
+                    {komiteer.map(k => (
+                      <option key={k.id} value={k.id}>{k.navn}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Saksreferanse (lenke)</label>
+                  <div className="relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.28" />
+                    </svg>
+                    <input
+                      type="url"
+                      value={stortingssakRef}
+                      onChange={e => setStortingssakRef(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                      placeholder="https://www.stortinget.no/..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sesjon */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stortingssesjon</label>
+                <input
+                  type="text"
+                  value={sesjon}
+                  onChange={e => setSesjon(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                  placeholder="F.eks. 2025-2026"
+                />
+              </div>
+            </>
+          )}
+
+          {niva !== 'påvirkning' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Komitédato</label>
+                <input
+                  type="date"
+                  value={komiteDato}
+                  onChange={e => setKomiteDato(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stortingsdato</label>
+                <input
+                  type="date"
+                  value={stortingsDato}
+                  onChange={e => setStortingsDato(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
                 />
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Sesjon */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stortingssesjon</label>
-            <input
-              type="text"
-              value={sesjon}
-              onChange={e => setSesjon(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
-              placeholder="F.eks. 2025-2026"
-            />
-          </div>
-
-          {/* Datoer */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Komitédato</label>
-              <input
-                type="date"
-                value={komiteDato}
-                onChange={e => setKomiteDato(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Stortingsdato</label>
-              <input
-                type="date"
-                value={stortingsDato}
-                onChange={e => setStortingsDato(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A9EDB] focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Høring */}
-          <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50/30">
+          {niva !== 'påvirkning' && <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50/30">
             <label className="block text-sm font-medium text-gray-700">Høring</label>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Høringsfrist</label>
@@ -349,38 +392,39 @@ export default function SakModal({ sak, komiteer, forelderId, forelderData, impo
                 />
               </div>
             </div>
-          </div>
+          </div>}
 
-          {/* Partistemmer */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Partistemmer</label>
-            <div className="space-y-2">
-              {PARTIER.map(parti => (
-                <div key={parti} className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-700 w-10">{parti}</span>
-                  <div className="flex gap-1">
-                    {STEMME_OPTIONS.map(opt => {
-                      const erAktiv = stemmer[parti] === opt.value
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setStemmer(prev => ({ ...prev, [parti]: opt.value }))}
-                          className={`px-3 py-1 text-xs rounded-md border transition-colors ${
-                            erAktiv
-                              ? `${opt.activeBg} ${opt.activeText} border-transparent font-medium`
-                              : `bg-white border-gray-200 text-gray-500 ${opt.bg}`
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      )
-                    })}
+          {niva !== 'påvirkning' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Partistemmer</label>
+              <div className="space-y-2">
+                {PARTIER.map(parti => (
+                  <div key={parti} className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700 w-10">{parti}</span>
+                    <div className="flex gap-1">
+                      {STEMME_OPTIONS.map(opt => {
+                        const erAktiv = stemmer[parti] === opt.value
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setStemmer(prev => ({ ...prev, [parti]: opt.value }))}
+                            className={`px-3 py-1 text-xs rounded-md border transition-colors ${
+                              erAktiv
+                                ? `${opt.activeBg} ${opt.activeText} border-transparent font-medium`
+                                : `bg-white border-gray-200 text-gray-500 ${opt.bg}`
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Error */}
           {feil && (

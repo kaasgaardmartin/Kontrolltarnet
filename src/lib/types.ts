@@ -1,5 +1,7 @@
 export type Rolle = 'leser' | 'redaktør' | 'org-admin'
-export type Niva = 'storting' | 'departement' | 'intern'
+export type Niva = 'storting' | 'departement' | 'intern' | 'påvirkning'
+
+export const STANDARD_FASER = ['Kartlegging', 'Kontakt', 'Forslag', 'Innspill', 'Politisk behandling'] as const
 export type Landing = 'vedtas' | 'faller' | 'usikkert' | 'ukjent' | 'vedtatt'
 export type Utfall = 'vedtatt' | 'ikke_vedtatt' | null
 export type Stemme = 'for' | 'mot' | 'ukjent'
@@ -47,6 +49,8 @@ export interface Sak {
   horingsfrist: string | null
   horingsnotat_url: string | null
   horingssvar_url: string | null
+  fase: string | null
+  malsetting: string | null
   created_by: string | null
   created_at: string
   updated_at: string
