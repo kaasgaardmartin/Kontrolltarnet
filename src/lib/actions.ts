@@ -134,7 +134,7 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
   // Fetch all non-archived saker with their votes, stakeholder names, activities, and hearings
   const { data: alleSaker } = await supabase
     .from('saker')
-    .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn)), aktiviteter(frist, status), horinger(innspillsfrist, anmodningsfrist, start_dato, status, skriftlig)')
+    .select('*, partistemmer(*), sak_stakeholders(stakeholders(navn)), aktiviteter(frist, status, nokkelresultat_id), horinger(innspillsfrist, anmodningsfrist, start_dato, status, skriftlig)')
     .eq('organisasjon_id', bruker.organisasjon_id)
     .eq('arkivert', false)
     .order('updated_at', { ascending: false })
@@ -147,8 +147,9 @@ export async function hentSakerMedStemmer(): Promise<SakMedStemmer[]> {
       .map(ss => ss.stakeholders?.navn)
       .filter((n): n is string => !!n)
 
-    // Beregn aktivitet-oppsummering
-    const aktiviteter = (s.aktiviteter ?? []) as { frist: string | null; status: string }[]
+    // Beregn aktivitet-oppsummering (ekskluder tiltak)
+    const alleAktiviteter = (s.aktiviteter ?? []) as { frist: string | null; status: string; nokkelresultat_id: string | null }[]
+    const aktiviteter = alleAktiviteter.filter(a => !a.nokkelresultat_id)
     const planlagte = aktiviteter.filter(a => a.status === 'planlagt')
     const frister = planlagte
       .map(a => a.frist)
@@ -518,11 +519,12 @@ export async function hentSak(sakId: string): Promise<SakDetaljer | null> {
 
   sak.sak_stakeholders = (sakStakeholders ?? []) as SakStakeholder[]
 
-  // Fetch aktiviteter
+  // Fetch aktiviteter (bare sak-aktiviteter, ikke tiltak)
   const { data: aktiviteter } = await supabase
     .from('aktiviteter')
     .select('*, stakeholders(navn), brukere:ansvarlig_id(navn)')
     .eq('sak_id', sakId)
+    .is('nokkelresultat_id', null)
     .order('frist', { ascending: true, nullsFirst: false })
 
   sak.aktiviteter = (aktiviteter ?? []) as Aktivitet[]
@@ -1253,6 +1255,7 @@ export async function hentKommendeAktiviteter(): Promise<(Aktivitet & { saker: {
     .select('*, stakeholders(navn), brukere:ansvarlig_id(navn), saker(id, tittel)')
     .eq('organisasjon_id', bruker.organisasjon_id)
     .eq('status', 'planlagt')
+    .is('nokkelresultat_id', null)
     .order('frist', { ascending: true, nullsFirst: false })
     .limit(20)
 

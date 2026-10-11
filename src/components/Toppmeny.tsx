@@ -129,6 +129,7 @@ export default function Toppmeny() {
 
   const navItems = [
     { href: '/', label: 'Stortinget' },
+    { href: '/pavirkning', label: 'Påvirkning' },
     { href: '/horinger', label: 'Høringer' },
     { href: '/mine-oppgaver', label: 'Mine oppgaver' },
     { href: '/organisasjoner', label: 'Bransjen' },

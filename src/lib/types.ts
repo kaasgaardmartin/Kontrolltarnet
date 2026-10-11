@@ -88,7 +88,8 @@ export interface Notat {
 
 export interface Lenke {
   id: string
-  sak_id: string
+  sak_id: string | null
+  maal_id: string | null
   organisasjon_id: string
   tittel: string
   url: string
@@ -121,14 +122,17 @@ export interface SakStakeholder {
 
 export interface Aktivitet {
   id: string
-  sak_id: string
+  sak_id: string | null
   organisasjon_id: string
   stakeholder_id: string | null
+  nokkelresultat_id: string | null
   type: AktivitetType
   beskrivelse: string
   ansvarlig_id: string | null
   frist: string | null
   status: AktivitetStatus
+  lukket_dato: string | null
+  updated_by: string | null
   created_by: string | null
   created_at: string
   updated_at: string
