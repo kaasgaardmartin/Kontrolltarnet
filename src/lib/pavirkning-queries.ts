@@ -1,12 +1,13 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { hentTemaer, hentMaalOversikt, hentMaal } from './pavirkning-actions'
+import { hentTemaer, hentMaalOversikt, hentMaal, hentPolitiskKvarter } from './pavirkning-actions'
 
 export const pavirkningKeys = {
   temaer: ['pavirkning', 'temaer'] as const,
   maalOversikt: (arkivert: boolean) => ['pavirkning', 'maal', arkivert ? 'arkiv' : 'aktive'] as const,
   maal: (id: string) => ['pavirkning', 'maal', id] as const,
+  pk: (id: string) => ['pavirkning', 'pk', id] as const,
 }
 
 export function useTemaer() {
@@ -32,6 +33,14 @@ export function useMaalDetaljer(maalId: string) {
   })
 }
 
+export function usePolitiskKvarter(pkId: string | null) {
+  return useQuery({
+    queryKey: pavirkningKeys.pk(pkId ?? ''),
+    queryFn: () => hentPolitiskKvarter(pkId!),
+    enabled: !!pkId,
+  })
+}
+
 export function useInvaliderPavirkning() {
   const queryClient = useQueryClient()
 
@@ -39,6 +48,9 @@ export function useInvaliderPavirkning() {
     invaliderMaal: (maalId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['pavirkning', 'maal'] })
       if (maalId) queryClient.invalidateQueries({ queryKey: pavirkningKeys.maal(maalId) })
+    },
+    invaliderPK: (pkId: string) => {
+      queryClient.invalidateQueries({ queryKey: pavirkningKeys.pk(pkId) })
     },
     invaliderAlt: () => {
       queryClient.invalidateQueries({ queryKey: ['pavirkning'] })

@@ -738,3 +738,181 @@ export async function sokHoringerForKobling(sok: string): Promise<{ id: string; 
 
   return data ?? []
 }
+
+// ============================================================
+// Politisk kvarter
+// ============================================================
+
+export async function startPolitiskKvarter(): Promise<Result> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  // Sjekk om det allerede pågår et møte
+  const { data: pagar } = await supabase
+    .from('politisk_kvarter')
+    .select('id')
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .eq('status', 'pagar')
+    .maybeSingle()
+
+  if (pagar) return { success: false, error: 'Et møte pågår allerede', id: pagar.id }
+
+  const { data: pk, error } = await supabase
+    .from('politisk_kvarter')
+    .insert({
+      organisasjon_id: bruker.organisasjon_id,
+      ordstyrer_id: bruker.id,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, id: pk.id }
+}
+
+export async function hentPolitiskKvarter(pkId: string) {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return null
+
+  const { data: pk } = await supabase
+    .from('politisk_kvarter')
+    .select(`
+      *,
+      politisk_kvarter_maal(
+        *,
+        maal:maal_id(
+          *,
+          tema(*),
+          nokkelresultater(
+            *,
+            aktiviteter:aktiviteter!nokkelresultat_id(*, brukere:ansvarlig_id(navn))
+          ),
+          gjennomslag(*),
+          maal_koblinger(
+            *,
+            saker:sak_id(id, tittel, landing, komite_dato, stortings_dato, horingsfrist),
+            offentlige_horinger:offentlig_horing_id(id, tittel, horingsfrist)
+          ),
+          statusoppdateringer!maal_id(*)
+        )
+      )
+    `)
+    .eq('id', pkId)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .single()
+
+  return pk
+}
+
+export async function opprettPKDagsorden(pkId: string, maalIder: string[]): Promise<Result> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  // Slett eksisterende dagsorden
+  await supabase
+    .from('politisk_kvarter_maal')
+    .delete()
+    .eq('politisk_kvarter_id', pkId)
+
+  if (maalIder.length === 0) return { success: true }
+
+  const rader = maalIder.map((maalId, i) => ({
+    politisk_kvarter_id: pkId,
+    maal_id: maalId,
+    rekkefolge: i,
+    valgt: true,
+  }))
+
+  const { error } = await supabase
+    .from('politisk_kvarter_maal')
+    .insert(rader)
+
+  if (error) return { success: false, error: error.message }
+
+  // Gå til gjennomgang
+  await supabase
+    .from('politisk_kvarter')
+    .update({ fase: 'gjennomgang', aktivt_maal_id: maalIder[0] })
+    .eq('id', pkId)
+
+  return { success: true }
+}
+
+export async function oppdaterPKMaalUtkast(pkId: string, maalId: string, utkast: {
+  kommentar?: string
+  sannsynlighet?: Record<string, number>
+  tiltak_gjort?: string[]
+  tiltak_droppet?: string[]
+  tiltak_utsatt?: string[]
+  nye_tiltak?: { nokkelresultat_id: string; beskrivelse: string; ansvarlig_id: string | null; frist: string }[]
+}): Promise<Result> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+
+  const { error } = await supabase
+    .from('politisk_kvarter_maal')
+    .update({
+      utkast: utkast,
+      kommentar: utkast.kommentar || null,
+      sist_endret_av: bruker.id,
+      behandlet: true,
+    })
+    .eq('politisk_kvarter_id', pkId)
+    .eq('maal_id', maalId)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function avsluttPolitiskKvarter(pkId: string, data: {
+  sannsynligheter: Record<string, number>
+  tiltak_gjort: string[]
+  tiltak_droppet: string[]
+  tiltak_utsatt: string[]
+  nye_tiltak: { nokkelresultat_id: string; beskrivelse: string; ansvarlig_id: string | null; frist: string }[]
+  kommentarer: Record<string, string>
+}): Promise<Result> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { data: resultat, error } = await supabase.rpc('avslutt_politisk_kvarter', {
+    p_pk_id: pkId,
+    p_organisasjon_id: bruker.organisasjon_id,
+    p_bruker_id: bruker.id,
+    p_sannsynligheter: data.sannsynligheter,
+    p_tiltak_gjort: data.tiltak_gjort,
+    p_tiltak_droppet: data.tiltak_droppet,
+    p_tiltak_utsatt: data.tiltak_utsatt,
+    p_nye_tiltak: data.nye_tiltak,
+    p_kommentarer: data.kommentarer,
+  })
+
+  if (error) return { success: false, error: error.message }
+  if (resultat && !resultat.success) return { success: false, error: resultat.error }
+  return { success: true }
+}
+
+export async function forkastPolitiskKvarter(pkId: string): Promise<Result> {
+  const supabase = await createServerSupabaseClient()
+  const bruker = await hentBrukerOgOrg()
+  if (!bruker) return { success: false, error: 'Ikke innlogget' }
+  if (bruker.rolle === 'leser') return { success: false, error: 'Ingen tilgang' }
+
+  const { error } = await supabase
+    .from('politisk_kvarter')
+    .update({ status: 'forkastet' })
+    .eq('id', pkId)
+    .eq('organisasjon_id', bruker.organisasjon_id)
+    .eq('status', 'pagar')
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
