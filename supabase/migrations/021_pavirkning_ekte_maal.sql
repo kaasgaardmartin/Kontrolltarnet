@@ -29,12 +29,12 @@ DELETE FROM maal;
 
 -- 2. Fjern temaer som tilhører feil organisasjon (duplikat fra dobbel seed)
 DELETE FROM tema
-WHERE organisasjon_id != '005526ab-033a-4f15-acb6-d61f22ac5892';
+WHERE organisasjon_id != '4370920e-4a84-4750-bde1-6ada5dc38c3e';
 
 -- 3. Sett inn de 16 ekte målene
 DO $$
 DECLARE
-  v_org_id UUID := '005526ab-033a-4f15-acb6-d61f22ac5892';
+  v_org_id UUID := '4370920e-4a84-4750-bde1-6ada5dc38c3e';
   v_rettshjelp UUID;
   v_salaer UUID;
   v_rettssikkerhet UUID;
